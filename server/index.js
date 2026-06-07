@@ -1,15 +1,12 @@
-// server/index.js
 require("dotenv").config();
-
 const express = require("express");
 const cors = require("cors");
-
-// Import database connection (runs on startup)
 require("./db");
 
 const authRoutes = require("./routes/authRoutes");
-const photoRoutes = require("./routes/photoRoutes"); // add this
-
+const photoRoutes = require("./routes/photoRoutes");
+const bookRoutes = require("./routes/bookRoutes");
+const templateRoutes = require("./routes/templateRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -17,12 +14,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// ─── Routes ───────────────────────────────────────────────
-// All auth routes will be at /api/auth/...
 app.use("/api/auth", authRoutes);
 app.use("/api/photos", photoRoutes);
+app.use("/api/books", bookRoutes);
+app.use("/api/templates", templateRoutes);
 
-// Test route
 app.get("/", (req, res) => {
   res.json({ message: "Travel Photo Book API is running ✅" });
 });

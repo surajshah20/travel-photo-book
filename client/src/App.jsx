@@ -7,6 +7,8 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import UploadPhotos from "./pages/UploadPhotos"; // add this
+import CreateBook from "./pages/CreateBook";  // add this
+
 
 
 // This protects routes — if not logged in, redirect to login
@@ -40,6 +42,23 @@ function App() {
           />
           <Route
             path="/upload"
+            element={
+              <PrivateRoute>
+                <UploadPhotos />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/create"
+            element={
+              <PrivateRoute>
+                <CreateBook />
+              </PrivateRoute>
+            }
+          />
+
+          <Route
+            path="/upload/:bookId"
             element={
               <PrivateRoute>
                 <UploadPhotos />

@@ -4,8 +4,11 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import api from "../api/axios";
+import { useParams } from "react-router-dom";
+    
 
-const UploadPhotos = ({ bookId }) => {
+const UploadPhotos = () => {
+  const { bookId } = useParams();
   const [photos, setPhotos] = useState([]);      // uploaded photo URLs to show
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
