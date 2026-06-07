@@ -13,7 +13,17 @@ pool.connect()
   .then(() => console.log("PostgreSQL connected ✅"))
   .catch((err) => console.error("DB connection error:", err.message));
 
-// We export query so any file can talk to the database
+// Temporary test route — we'll remove this later
+app.get("/api/test-db", async (req, res) => {
+  try {
+    const result = await require("./db").query("SELECT * FROM templates");
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+  // We export query so any file can talk to the database
 module.exports = {
   query: (text, params) => pool.query(text, params),
 };
