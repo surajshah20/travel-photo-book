@@ -8,6 +8,8 @@ const cors = require("cors");
 require("./db");
 
 const authRoutes = require("./routes/authRoutes");
+const photoRoutes = require("./routes/photoRoutes"); // add this
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +20,7 @@ app.use(express.json());
 // ─── Routes ───────────────────────────────────────────────
 // All auth routes will be at /api/auth/...
 app.use("/api/auth", authRoutes);
+app.use("/api/photos", photoRoutes);
 
 // Test route
 app.get("/", (req, res) => {

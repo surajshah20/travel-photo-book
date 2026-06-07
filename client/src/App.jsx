@@ -6,6 +6,8 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import UploadPhotos from "./pages/UploadPhotos"; // add this
+
 
 // This protects routes — if not logged in, redirect to login
 const PrivateRoute = ({ children }) => {
@@ -33,6 +35,14 @@ function App() {
             element={
               <PrivateRoute>
                 <Home />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <PrivateRoute>
+                <UploadPhotos />
               </PrivateRoute>
             }
           />
