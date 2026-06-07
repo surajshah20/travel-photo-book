@@ -1,0 +1,4 @@
+/* These 3 lines activate Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
