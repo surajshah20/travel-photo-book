@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import UploadPhotos from "./pages/UploadPhotos"; // add this
 import CreateBook from "./pages/CreateBook";  // add this
 import BookEditor from "./pages/BookEditor"; // add this
+import BookPreview from "./pages/BookPreview"; // add this
 
 
 
@@ -75,6 +76,14 @@ function App() {
               </PrivateRoute>
             }
           />
+          <Route
+  path="/preview/:bookId"
+  element={
+    <PrivateRoute>
+      <BookPreview />
+    </PrivateRoute>
+  }
+/>
         </Routes>
       </AuthProvider>
     </BrowserRouter>
