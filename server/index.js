@@ -7,6 +7,9 @@ const authRoutes = require("./routes/authRoutes");
 const photoRoutes = require("./routes/photoRoutes");
 const bookRoutes = require("./routes/bookRoutes");
 const templateRoutes = require("./routes/templateRoutes");
+const aiRoutes = require("./routes/aiRoutes"); // add this
+const pageRoutes = require("./routes/pageRoutes"); // add this
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +21,9 @@ app.use("/api/auth", authRoutes);
 app.use("/api/photos", photoRoutes);
 app.use("/api/books", bookRoutes);
 app.use("/api/templates", templateRoutes);
+app.use("/api/ai", aiRoutes); // add this
+app.use("/api/pages", pageRoutes); // add this
+
 
 app.get("/", (req, res) => {
   res.json({ message: "Travel Photo Book API is running ✅" });

@@ -8,6 +8,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import UploadPhotos from "./pages/UploadPhotos"; // add this
 import CreateBook from "./pages/CreateBook";  // add this
+import BookEditor from "./pages/BookEditor"; // add this
+
 
 
 
@@ -62,6 +64,14 @@ function App() {
             element={
               <PrivateRoute>
                 <UploadPhotos />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/editor/:bookId"
+            element={
+              <PrivateRoute>
+                <BookEditor />
               </PrivateRoute>
             }
           />

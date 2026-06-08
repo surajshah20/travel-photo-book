@@ -17,4 +17,19 @@ router.get("/:bookId", protect, getPhotos);
 // DELETE /api/photos/:photoId — delete a photo
 router.delete("/:photoId", protect, removePhoto);
 
+// Add this route to photoRoutes.js
+router.put("/:photoId/caption", protect, async (req, res) => {
+  try {
+    const { caption } = req.body;
+    await require("../db").query(
+      "UPDATE photos SET caption = $1 WHERE id = $2",
+      [caption, req.params.photoId]
+    );
+    res.json({ message: "Caption updated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Could not update caption" });
+  }
+});
+
 module.exports = router;
