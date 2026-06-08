@@ -10,7 +10,8 @@ import UploadPhotos from "./pages/UploadPhotos"; // add this
 import CreateBook from "./pages/CreateBook";  // add this
 import BookEditor from "./pages/BookEditor"; // add this
 import BookPreview from "./pages/BookPreview"; // add this
-
+import OrderPage from "./pages/OrderPage";     // add
+import OrdersPage from "./pages/OrdersPage";   // add
 
 
 
@@ -77,13 +78,29 @@ function App() {
             }
           />
           <Route
-  path="/preview/:bookId"
-  element={
-    <PrivateRoute>
-      <BookPreview />
-    </PrivateRoute>
-  }
-/>
+            path="/order/:bookId"
+            element={
+              <PrivateRoute>
+                <OrderPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/orders"
+            element={
+              <PrivateRoute>
+                <OrdersPage />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/preview/:bookId"
+            element={
+              <PrivateRoute>
+                <BookPreview />
+              </PrivateRoute>
+            }
+          />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

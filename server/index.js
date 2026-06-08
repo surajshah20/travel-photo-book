@@ -9,6 +9,8 @@ const bookRoutes = require("./routes/bookRoutes");
 const templateRoutes = require("./routes/templateRoutes");
 const aiRoutes = require("./routes/aiRoutes"); // add this
 const pageRoutes = require("./routes/pageRoutes"); // add this
+const orderRoutes = require("./routes/orderRoutes"); // add this
+
 
 
 const app = express();
@@ -23,6 +25,8 @@ app.use("/api/books", bookRoutes);
 app.use("/api/templates", templateRoutes);
 app.use("/api/ai", aiRoutes); // add this
 app.use("/api/pages", pageRoutes); // add this
+app.use("/api/orders", orderRoutes); // add this
+
 
 
 app.get("/", (req, res) => {
