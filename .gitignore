@@ -15,4 +15,5 @@ client/dist/
 .DS_Store
 Thumbs.db
 
-dist
+distnode_modules/
+package-lock.json
