@@ -1,195 +1,176 @@
 // server/controllers/authController.js
-// Production-ready auth with proper validation
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const db = require("../db");
 
-// ─── REGISTER ─────────────────────────────────────────────
+// ─── Safe user fields — NEVER include password ────────────
+const SAFE_USER_FIELDS = `
+  id, name, email, avatar_url, auth_provider, is_admin, created_at
+`;
+
+const signToken = (user) =>
+  jwt.sign(
+    { 
+      id: user.id, 
+      email: user.email, 
+      is_admin: user.is_admin // ✅ Added admin flag to the secure payload
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+// ✅ Helper to attach secure cookie
+const setAuthCookie = (res, token) => {
+  res.cookie("token", token, {
+    httpOnly: true, // Blocks JavaScript from reading the cookie (prevents XSS)
+    secure: process.env.NODE_ENV === "production", // HTTPS only in prod
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+};
+
+// ─── Register ─────────────────────────────────────────────
 const register = async (req, res) => {
+  const { name, email, password } = req.body;
+
+  if (!name?.trim() || !email?.trim() || !password) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+  if (name.trim().length < 2) {
+    return res.status(400).json({ error: "Name must be at least 2 characters" });
+  }
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: "Please enter a valid email address" });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Password must be at least 8 characters" });
+  }
+
   try {
-    let { name, email, password } = req.body;
-
-    // ── Validation ──────────────────────────────────────
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: "All fields are required" });
-    }
-
-    // Normalize email
-    email = email.toLowerCase().trim();
-    name = name.trim();
-
-    // Email format check
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address" });
-    }
-
-    // Password strength
-    if (password.length < 8) {
-      return res.status(400).json({ error: "Password must be at least 8 characters" });
-    }
-    if (!/[A-Z]/.test(password)) {
-      return res.status(400).json({ error: "Password must contain at least one uppercase letter" });
-    }
-    if (!/[a-z]/.test(password)) {
-      return res.status(400).json({ error: "Password must contain at least one lowercase letter" });
-    }
-    if (!/[0-9]/.test(password)) {
-      return res.status(400).json({ error: "Password must contain at least one number" });
-    }
-
-    // Check duplicate email
     const existing = await db.query(
       "SELECT id FROM users WHERE email = $1",
-      [email]
+      [email.toLowerCase().trim()]
     );
     if (existing.rows.length > 0) {
-      return res.status(400).json({ error: "An account with this email already exists" });
+      return res.status(409).json({ error: "An account with this email already exists" });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hash = await bcrypt.hash(password, 12);
 
-    // Create user
     const result = await db.query(
-      "INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email, created_at",
-      [name, email, hashedPassword]
+      `INSERT INTO users (name, email, password, auth_provider)
+       VALUES ($1, $2, $3, 'email')
+       RETURNING ${SAFE_USER_FIELDS}`,
+      [name.trim(), email.toLowerCase().trim(), hash]
     );
 
     const user = result.rows[0];
-
-    // Create token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.status(201).json({
-      message: "Account created successfully",
-      token,
-      user: { id: user.id, name: user.name, email: user.email },
-    });
-
+    const token = signToken(user);
+    
+    setAuthCookie(res, token); // ✅ Issue Cookie
+    res.status(201).json({ user }); // ✅ Removed token from payload
   } catch (err) {
-    console.error("Register error:", err.message);
-    res.status(500).json({ error: "Server error. Please try again." });
+    console.error("Register error:", err);
+    res.status(500).json({ error: "Registration failed. Please try again." });
   }
 };
 
-// ─── LOGIN ────────────────────────────────────────────────
+// ─── Login ────────────────────────────────────────────────
 const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email?.trim() || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+
   try {
-    let { email, password, rememberMe } = req.body;
-
-    // ── Validation ──────────────────────────────────────
-    if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
-    }
-
-    email = email.toLowerCase().trim();
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ error: "Please enter a valid email address" });
-    }
-
-    // Find user
     const result = await db.query(
-      "SELECT * FROM users WHERE email = $1",
-      [email]
+      `SELECT id, name, email, password, avatar_url, auth_provider, is_admin
+       FROM users WHERE email = $1`,
+      [email.toLowerCase().trim()]
     );
-
-    // Use same error for both wrong email and wrong password
-    // (prevents email enumeration attacks)
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: "Invalid email or password" });
-    }
 
     const user = result.rows[0];
 
-    // Verify password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Invalid email or password" });
+    // Constant-time comparison to prevent timing attacks
+    const passwordToCheck = password;
+    const hashToCompare = user?.password || "$2b$12$invalidhashfortimingatack";
+    const match = await bcrypt.compare(passwordToCheck, hashToCompare);
+
+    if (!user || !match) {
+      return res.status(401).json({ error: "Incorrect email or password" });
     }
 
-    // Token expiry — 30 days if remember me, 7 days otherwise
-    const expiresIn = rememberMe ? "30d" : "7d";
+    if (user.auth_provider === "google" && !user.password) {
+      return res.status(401).json({
+        error: "This account uses Google Sign-In. Please continue with Google.",
+      });
+    }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn }
-    );
-
-    res.json({
-      message: "Login successful",
-      token,
-      user: { id: user.id, name: user.name, email: user.email },
-    });
-
+    const { password: _pw, ...safeUser } = user;
+    const token = signToken(safeUser);
+    
+    setAuthCookie(res, token); // ✅ Issue Cookie
+    res.json({ user: safeUser }); // ✅ Removed token from payload
   } catch (err) {
-    console.error("Login error:", err.message);
-    res.status(500).json({ error: "Server error. Please try again." });
+    console.error("Login error:", err);
+    res.status(500).json({ error: "Login failed. Please try again." });
   }
 };
 
-// ─── VERIFY TOKEN ─────────────────────────────────────────
-// Frontend calls this to verify token is still valid
+// ─── Logout ───────────────────────────────────────────────
+const logout = (req, res) => {
+  // ✅ Tell the browser to delete the cookie
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+  });
+  res.json({ message: "Logged out successfully" });
+};
+
+// ─── Verify Token ─────────────────────────────────────────
 const verifyToken = async (req, res) => {
   try {
-    // req.user is set by authMiddleware
     const result = await db.query(
-      "SELECT id, name, email FROM users WHERE id = $1",
-      [req.user.id]
+      `SELECT ${SAFE_USER_FIELDS} FROM users WHERE id = $1`,
+      [req.user.id] // req.user comes from your authMiddleware verifying the cookie
     );
-
-    if (result.rows.length === 0) {
+    if (!result.rows.length) {
       return res.status(401).json({ error: "User not found" });
     }
-
     res.json({ user: result.rows[0] });
   } catch (err) {
-    console.error("Verify error:", err.message);
-    res.status(401).json({ error: "Invalid token" });
+    console.error("Verify error:", err);
+    res.status(500).json({ error: "Verification failed" });
   }
 };
 
-module.exports = { register, login, verifyToken };
-
-// server/config/passport.js
-// Add this to the bottom of authController.js
-// ─── GOOGLE OAUTH CALLBACK ────────────────────────────────
-// Called after Google redirects back to our server
+// ─── Google OAuth Callback ────────────────────────────────
 const googleCallback = async (req, res) => {
   try {
     const user = req.user;
-
     if (!user) {
-      return res.redirect(
-        `${process.env.CLIENT_URL}/login?error=oauth_failed`
-      );
+      return res.redirect(`${process.env.CLIENT_URL}/login?error=oauth_failed`);
     }
 
-    // Create JWT token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signToken(user);
+    setAuthCookie(res, token); // ✅ Securely issue cookie
 
-    // Redirect to frontend with token in URL
-    // Frontend will extract it and save to localStorage
+    // ✅ Clean redirect URL without exposing the token
     res.redirect(
-      `${process.env.CLIENT_URL}/auth/callback?token=${token}&name=${encodeURIComponent(user.name)}&email=${encodeURIComponent(user.email)}&id=${user.id}`
+      `${process.env.CLIENT_URL}/auth/callback` +
+      `?name=${encodeURIComponent(user.name)}` +
+      `&email=${encodeURIComponent(user.email)}` +
+      `&id=${user.id}`
     );
-
   } catch (err) {
     console.error("Google callback error:", err);
     res.redirect(`${process.env.CLIENT_URL}/login?error=server_error`);
   }
 };
 
-module.exports = { register, login, verifyToken, googleCallback };
+// Export logout as well
+module.exports = { register, login, logout, verifyToken, googleCallback };

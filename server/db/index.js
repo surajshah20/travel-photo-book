@@ -1,19 +1,27 @@
 // server/db/index.js
-// This file connects our Express app to PostgreSQL
 
 const { Pool } = require("pg");
 
-// Pool manages multiple database connections efficiently
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  ssl: process.env.NODE_ENV === "production"
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
-// Test the connection when server starts
-pool.connect()
-  .then(() => console.log("PostgreSQL connected ✅"))
-  .catch((err) => console.error("DB connection error:", err.message));
+pool.on("error", (err) => {
+  console.error("Unexpected database error:", err);
+});
 
-  // We export query so any file can talk to the database
-module.exports = {
-  query: (text, params) => pool.query(text, params),
-};
+// Test connection on startup
+pool.query("SELECT NOW()").then(() => {
+  console.log("✅ Database connected");
+}).catch(err => {
+  console.error("❌ Database connection failed:", err.message);
+  process.exit(1);
+});
+
+module.exports = pool;

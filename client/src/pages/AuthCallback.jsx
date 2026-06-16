@@ -1,9 +1,12 @@
 // client/src/pages/AuthCallback.jsx
+// BlushBook — Secure OAuth Callback Handler
 
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { BookOpen } from "lucide-react";
+import { CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../design-system/Logo";
+import { C } from "../design-system/index";
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -12,14 +15,14 @@ const AuthCallback = () => {
 
   const [status, setStatus] = useState("processing");
 
-  // ✅ Prevent double execution (fixes infinite loop)
+  // Prevent double execution in React Strict Mode
   const hasRun = useRef(false);
 
   useEffect(() => {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    const token = searchParams.get("token");
+    // Notice: We NO LONGER extract a token here. The secure httpOnly cookie handles it!
     const name = searchParams.get("name");
     const email = searchParams.get("email");
     const id = searchParams.get("id");
@@ -33,7 +36,7 @@ const AuthCallback = () => {
     }
 
     // ❌ Missing required data
-    if (!token || !email) {
+    if (!email || !id) {
       setStatus("error");
       setTimeout(() => navigate("/login", { replace: true }), 2000);
       return;
@@ -41,14 +44,14 @@ const AuthCallback = () => {
 
     // ✅ Create user object safely
     const user = {
-      id: id ? parseInt(id) : null,
+      id: parseInt(id),
       name: name ? decodeURIComponent(name) : "",
       email: decodeURIComponent(email),
     };
 
     try {
-      // ✅ Save auth state
-      loginUser(user, token);
+      // ✅ Save auth state (no token needed, cookie is already set by backend)
+      loginUser(user);
       setStatus("success");
 
       // ✅ Redirect after short delay
@@ -66,86 +69,83 @@ const AuthCallback = () => {
   }, [searchParams, navigate, loginUser]);
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="text-center">
+    <div style={{
+      minHeight: "100vh", background: C.bgSoft,
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      fontFamily: "'Plus Jakarta Sans', sans-serif",
+    }}>
+      <div style={{
+        background: "#fff", border: `1px solid ${C.line}`,
+        borderRadius: 24, padding: "48px 40px",
+        textAlign: "center", boxShadow: "0 12px 40px rgba(0,0,0,0.04)",
+        width: "100%", maxWidth: 400
+      }}>
         
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center">
-            <BookOpen className="w-5 h-5 text-white" />
-          </div>
-          <span
-            className="text-2xl font-bold text-gray-900"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            blush<span className="text-rose-500">book</span>
-          </span>
+        <div style={{ marginBottom: 32, display: "flex", justifyContent: "center" }}>
+          <Logo size={24} clickable={false} />
         </div>
 
-        {/* Processing */}
+        {/* Processing State */}
         {status === "processing" && (
-          <>
-            <div className="w-10 h-10 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-gray-500 text-sm">
-              Signing you in with Google...
+          <div className="animate-in fade-in zoom-in duration-300">
+            <div style={{
+              width: 48, height: 48, border: `4px solid ${C.roseSoft}`,
+              borderTopColor: C.rose, borderRadius: "50%",
+              animation: "spin 0.8s linear infinite", margin: "0 auto 20px"
+            }} />
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: C.ink, margin: "0 0 6px" }}>
+              Securely signing you in...
+            </h2>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+              Please wait while we set up your session.
             </p>
-          </>
+          </div>
         )}
 
-        {/* Success */}
+        {/* Success State */}
         {status === "success" && (
-          <>
-            <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-7 h-7 text-green-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2.5}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
+          <div className="animate-in fade-in zoom-in duration-300">
+            <div style={{
+              width: 56, height: 56, background: "#DCFCE7",
+              borderRadius: "50%", display: "flex", alignItems: "center",
+              justifyContent: "center", margin: "0 auto 20px"
+            }}>
+              <CheckCircle size={28} color="#16A34A" />
             </div>
-            <p className="text-gray-700 font-semibold mb-1">
-              Signed in successfully!
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: C.ink, margin: "0 0 6px" }}>
+              Welcome back!
+            </h2>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
+              Redirecting to your workspace...
             </p>
-            <p className="text-gray-400 text-sm">
-              Redirecting to your dashboard...
-            </p>
-          </>
+          </div>
         )}
 
-        {/* Error */}
+        {/* Error State */}
         {status === "error" && (
-          <>
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="w-7 h-7 text-red-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
+          <div className="animate-in fade-in zoom-in duration-300">
+            <div style={{
+              width: 56, height: 56, background: "#FEE2E2",
+              borderRadius: "50%", display: "flex", alignItems: "center",
+              justifyContent: "center", margin: "0 auto 20px"
+            }}>
+              <AlertCircle size={28} color="#DC2626" />
             </div>
-            <p className="text-gray-700 font-semibold mb-1">
-              Sign in failed
-            </p>
-            <p className="text-gray-400 text-sm">
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: C.ink, margin: "0 0 6px" }}>
+              Authentication Failed
+            </h2>
+            <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
               Redirecting back to login...
             </p>
-          </>
+          </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </div>
   );
 };

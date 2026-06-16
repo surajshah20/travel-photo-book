@@ -1,347 +1,397 @@
 // client/src/pages/OrderPage.jsx
-// Blushbook — Professional Order Page
+// BlushBook — Production Order Page (eSewa + Khalti)
 
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { loadStripe } from "@stripe/stripe-js";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
-  Elements,
-  CardElement,
-  useStripe,
-  useElements,
-} from "@stripe/react-stripe-js";
-import {
-  BookOpen, ChevronLeft, Shield,
-  Truck, CheckCircle, Package
+  Package, MapPin, Phone, User,
+  AlertCircle, Lock, BookOpen, Truck
 } from "lucide-react";
 import api from "../api/axios";
+import AppNavbar from "../design-system/AppNavbar";
 
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
-);
+// ─── DATA & CONSTANTS ─────────────────────────────────────
+const PROVINCES = [
+  "Koshi Province", "Madhesh Province", "Bagmati Province",
+  "Gandaki Province", "Lumbini Province", "Karnali Province",
+  "Sudurpashchim Province",
+];
 
-// ─── CHECKOUT FORM ────────────────────────────────────────
-const CheckoutForm = ({ bookId, amount, book }) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const navigate = useNavigate();
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState(false);
-  const [shipping, setShipping] = useState({
-    shipping_name: "",
-    shipping_address: "",
-    shipping_city: "",
-    shipping_country: "",
-    shipping_zip: "",
-  });
-
-  const handleChange = (e) => {
-    setShipping({ ...shipping, [e.target.name]: e.target.value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!stripe || !elements) return;
-    setLoading(true);
-    setError("");
-
-    try {
-      const intentRes = await api.post("/orders/payment-intent", { bookId });
-      const { clientSecret } = intentRes.data;
-
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-          billing_details: { name: shipping.shipping_name },
-        },
-      });
-
-      if (result.error) {
-        setError(result.error.message);
-        return;
-      }
-
-      await api.post("/orders", {
-        bookId,
-        stripePaymentId: result.paymentIntent.id,
-        totalPrice: amount,
-        ...shipping,
-      });
-
-      setSuccess(true);
-      setTimeout(() => navigate("/orders"), 3000);
-    } catch (err) {
-      console.error(err);
-      setError("Payment failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (success) {
-    return (
-      <div className="text-center py-16">
-        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-          <CheckCircle className="w-10 h-10 text-green-500" />
-        </div>
-        <h2
-          className="text-2xl font-bold text-gray-900 mb-2"
-          style={{ fontFamily: "Georgia, serif" }}
-        >
-          Order placed successfully!
-        </h2>
-        <p className="text-gray-400 text-sm mb-2">
-          Your travel book is being prepared for printing.
-        </p>
-        <p className="text-gray-300 text-xs">
-          Redirecting to your orders...
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-
-      {/* ── Shipping ── */}
-      <div>
-        <h3
-          className="font-bold text-gray-900 text-lg mb-6"
-          style={{ fontFamily: "Georgia, serif" }}
-        >
-          Shipping Information
-        </h3>
-        <div className="space-y-4">
-          {[
-            { name: "shipping_name", label: "Full Name", placeholder: "Your full name" },
-            { name: "shipping_address", label: "Street Address", placeholder: "123 Main Street" },
-            { name: "shipping_city", label: "City", placeholder: "Mumbai" },
-            { name: "shipping_country", label: "Country", placeholder: "India" },
-            { name: "shipping_zip", label: "ZIP / Postal Code", placeholder: "400001" },
-          ].map((field) => (
-            <div key={field.name}>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                {field.label}
-              </label>
-              <input
-                type="text"
-                name={field.name}
-                value={shipping[field.name]}
-                onChange={handleChange}
-                placeholder={field.placeholder}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 transition"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Trust badges */}
-        <div className="grid grid-cols-3 gap-3 mt-6">
-          {[
-            { icon: <Truck className="w-4 h-4 text-rose-500" />, text: "Free shipping over $50" },
-            { icon: <Shield className="w-4 h-4 text-rose-500" />, text: "Secure payment" },
-            { icon: <Package className="w-4 h-4 text-rose-500" />, text: "5-12 day delivery" },
-          ].map((badge) => (
-            <div
-              key={badge.text}
-              className="bg-rose-50 rounded-xl p-3 text-center"
-            >
-              <div className="flex justify-center mb-1">{badge.icon}</div>
-              <p className="text-xs text-gray-500 leading-tight">{badge.text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Payment ── */}
-      <div>
-        <h3
-          className="font-bold text-gray-900 text-lg mb-6"
-          style={{ fontFamily: "Georgia, serif" }}
-        >
-          Payment
-        </h3>
-
-        {/* Order summary */}
-        <div className="bg-gray-50 rounded-2xl p-5 mb-6">
-          <div className="flex items-center gap-4 mb-4 pb-4 border-b border-gray-100">
-            {book?.cover_image_url && (
-              <img
-                src={book.cover_image_url}
-                alt=""
-                className="w-16 h-12 object-cover rounded-xl"
-              />
-            )}
-            <div>
-              <p className="font-semibold text-gray-800 text-sm">{book?.title}</p>
-              <p className="text-gray-400 text-xs">{book?.destination}</p>
-              <p className="text-rose-500 font-bold text-sm mt-0.5">
-                ${amount}
-              </p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Subtotal</span>
-              <span className="font-medium text-gray-800">${amount}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Shipping</span>
-              <span className="font-medium text-green-600">Free</span>
-            </div>
-            <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
-              <span className="font-bold text-gray-800">Total</span>
-              <span className="font-bold text-gray-900 text-lg">${amount}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card input */}
-        <div className="mb-4">
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Card Details
-          </label>
-          <div className="border border-gray-200 rounded-xl px-4 py-3.5 bg-white focus-within:ring-2 focus-within:ring-rose-300 transition">
-            <CardElement
-              options={{
-                style: {
-                  base: {
-                    fontSize: "15px",
-                    color: "#374151",
-                    fontFamily: "Inter, sans-serif",
-                    "::placeholder": { color: "#d1d5db" },
-                  },
-                },
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Test card hint */}
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 mb-5">
-          <p className="text-xs text-blue-600 font-semibold mb-1">
-            Test Mode
-          </p>
-          <p className="text-xs text-blue-500 font-mono">
-            4242 4242 4242 4242 · Any future date · Any CVC
-          </p>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-100 text-red-500 px-4 py-3 rounded-xl mb-4 text-sm">
-            {error}
-          </div>
-        )}
-
-        {/* Pay button */}
-        <button
-          onClick={handleSubmit}
-          disabled={loading || !stripe}
-          className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-sm hover:bg-rose-500 transition disabled:opacity-50"
-        >
-          {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Processing payment...
-            </span>
-          ) : (
-            `Pay $${amount}`
-          )}
-        </button>
-
-        <p className="text-center text-gray-300 text-xs mt-3 flex items-center justify-center gap-1">
-          <Shield className="w-3 h-3" />
-          Secured by Stripe · SSL encrypted
-        </p>
-      </div>
-    </div>
-  );
+const BOOK_PRICES = {
+  journal: 2499,
+  scrapbook: 2999,
+  hardcover: 4499,
+  luxury: 6499,
+  default: 2999,
 };
 
-// ─── MAIN ORDER PAGE ──────────────────────────────────────
+// ─── REUSABLE COMPONENTS ──────────────────────────────────
+const FormField = ({ label, required, error, icon: Icon, children }) => (
+  <div className="mb-5">
+    <label className="block text-xs font-bold text-gray-900 uppercase tracking-wide mb-2">
+      {label} {required && <span className="text-rose-500">*</span>}
+    </label>
+    <div className="relative">
+      {Icon && <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />}
+      {children}
+    </div>
+    {error && (
+      <p className="flex items-center gap-1.5 mt-2 text-xs font-medium text-red-600">
+        <AlertCircle className="w-3.5 h-3.5" /> {error}
+      </p>
+    )}
+  </div>
+);
+
+const PaymentCard = ({ id, selected, onSelect, logo, name, desc, colorClass, ringClass }) => (
+  <button
+    onClick={() => onSelect(id)}
+    className={`w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all duration-200
+      ${selected === id ? `bg-white ${ringClass} shadow-md scale-[1.01]` : "bg-white border-gray-200 hover:border-gray-300"}`}
+  >
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg ${colorClass} bg-opacity-10`}>
+      {logo}
+    </div>
+    <div className="flex-1">
+      <p className="font-bold text-gray-900 text-sm mb-0.5">{name}</p>
+      <p className="text-xs text-gray-500 font-medium">{desc}</p>
+    </div>
+    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+      ${selected === id ? ringClass.replace('border', 'bg').replace('ring', 'bg') + " border-transparent" : "border-gray-300"}`}>
+      {selected === id && <div className="w-2 h-2 rounded-full bg-white" />}
+    </div>
+  </button>
+);
+
+// ─── MAIN COMPONENT ───────────────────────────────────────
 const OrderPage = () => {
   const { bookId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("esewa");
+  const [errors, setErrors] = useState({});
+  const [serverError, setServerError] = useState("");
 
-  const PRICES = {
-    journal: 19.99,
-    hardcover: 34.99,
-    luxury: 49.99,
-    scrapbook: 24.99,
-  };
+  const params = new URLSearchParams(location.search);
+  const paymentResult = params.get("payment");
+
+  const [shipping, setShipping] = useState({
+    name: "", phone: "", address: "",
+    city: "", district: "", province: "Bagmati Province", notes: "",
+  });
 
   useEffect(() => {
-    api.get(`/books/${bookId}`).then((res) => {
-      setBook(res.data);
-      setLoading(false);
-    });
+    api.get(`/books/${bookId}`)
+      .then(res => setBook(res.data))
+      .catch(() => navigate("/dashboard"))
+      .finally(() => setLoading(false));
   }, [bookId]);
+
+  const price = BOOK_PRICES[book?.book_type] || BOOK_PRICES.default;
+  const shipping_charge = 150;
+  const total = price + shipping_charge;
+
+  const handleShipping = (e) => {
+    setShipping(p => ({ ...p, [e.target.name]: e.target.value }));
+    if (errors[e.target.name]) setErrors(p => ({ ...p, [e.target.name]: "" }));
+  };
+
+  const validate = () => {
+    const errs = {};
+    if (!shipping.name.trim()) errs.name = "Full name is required";
+    if (!shipping.phone.trim() || !/^[9][0-9]{9}$/.test(shipping.phone))
+      errs.phone = "Valid 10-digit Nepali phone number required";
+    if (!shipping.address.trim()) errs.address = "Address is required";
+    if (!shipping.city.trim()) errs.city = "City is required";
+    if (!shipping.district.trim()) errs.district = "District is required";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validate()) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setSubmitting(true);
+    setServerError("");
+
+    const payload = {
+      bookId: parseInt(bookId),
+      bookType: book?.book_type || "hardcover",
+      shipping,
+    };
+
+    try {
+      if (paymentMethod === "esewa") {
+        const res = await api.post("/payments/esewa/initiate", payload);
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = res.data.paymentUrl;
+        Object.entries(res.data.formData).forEach(([key, val]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = val;
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+
+      } else if (paymentMethod === "khalti") {
+        const res = await api.post("/payments/khalti/initiate", payload);
+        window.location.href = res.data.paymentUrl;
+
+      } else if (paymentMethod === "cod") {
+        // Updated to use the new unified payments router
+        const res = await api.post("/payments/cod", payload);
+        navigate(`/orders?payment=success&orderId=${res.data.orderId}`);
+      }
+
+    } catch (err) {
+      console.error(err);
+      setServerError(err.response?.data?.error || "Could not place order. Please try again.");
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-10 h-10 border-4 border-rose-300 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mb-4" />
+        <p className="text-gray-500 font-medium text-sm">Loading order details...</p>
       </div>
     );
   }
 
-  const amount = PRICES[book?.book_type] || 19.99;
+  const baseInputClass = "w-full bg-gray-50 border rounded-xl py-3.5 text-sm font-medium focus:bg-white focus:outline-none focus:ring-1 transition-all";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-8 py-4 flex items-center gap-4 sticky top-0 z-50">
-        <button
-          onClick={() => navigate(`/preview/${bookId}`)}
-          className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm transition"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          Back
-        </button>
-        <div className="w-px h-4 bg-gray-200" />
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 bg-rose-500 rounded-lg flex items-center justify-center">
-            <BookOpen className="w-4 h-4 text-white" />
+    <div className="min-h-screen bg-[#FAFAFA] font-sans flex flex-col">
+      <AppNavbar backTo={`/preview/${bookId}`} backLabel="Preview" title="Checkout" />
+
+      <main className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-8 md:py-12">
+
+        {/* Payment Failure Banners */}
+        {paymentResult === "failed" && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl mb-8 flex items-center gap-3 animate-in fade-in">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-bold">Payment was not completed. Please try again or choose a different payment method.</span>
           </div>
-          <span
-            className="font-bold text-gray-900"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            blush<span className="text-rose-500">book</span>
-          </span>
-        </div>
-        <span className="text-gray-300">·</span>
-        <span className="text-gray-500 text-sm">Complete Your Order</span>
-      </nav>
+        )}
+        {paymentResult === "cancelled" && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-5 py-4 rounded-2xl mb-8 flex items-center gap-3 animate-in fade-in">
+            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-bold">Payment was cancelled. You can try again below.</span>
+          </div>
+        )}
 
-      <div className="max-w-4xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold text-gray-900 mb-1"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            Complete your order
-          </h1>
-          <p className="text-gray-400 text-sm">
-            You're one step away from holding your memories in your hands
-          </p>
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
 
-        <div className="bg-white rounded-3xl shadow-card p-8">
-          <Elements stripe={stripePromise}>
-            <CheckoutForm
-              bookId={bookId}
-              amount={amount}
-              book={book}
-            />
-          </Elements>
+          {/* ── LEFT COLUMN: FORMS ── */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-8">
+
+            {/* Shipping Section */}
+            <section className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-900">
+                  <MapPin className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 font-display">Delivery Address</h2>
+                  <p className="text-sm text-gray-500 font-medium">We deliver anywhere in Nepal</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
+                <div className="md:col-span-2">
+                  <FormField label="Full Name" required error={errors.name} icon={User}>
+                    <input
+                      name="name" value={shipping.name} onChange={handleShipping}
+                      placeholder="Your full name"
+                      className={`${baseInputClass} pl-11 pr-4 ${errors.name ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'}`}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="md:col-span-2">
+                  <FormField label="Phone Number" required error={errors.phone} icon={Phone}>
+                    <input
+                      name="phone" value={shipping.phone} onChange={handleShipping}
+                      placeholder="98XXXXXXXX"
+                      className={`${baseInputClass} pl-11 pr-4 ${errors.phone ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'}`}
+                    />
+                  </FormField>
+                </div>
+
+                <div className="md:col-span-2">
+                  <FormField label="Street Address" required error={errors.address}>
+                    <input
+                      name="address" value={shipping.address} onChange={handleShipping}
+                      placeholder="Ward no., Tole, Street"
+                      className={`${baseInputClass} px-4 ${errors.address ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'}`}
+                    />
+                  </FormField>
+                </div>
+
+                <FormField label="City / VDC" required error={errors.city}>
+                  <input
+                    name="city" value={shipping.city} onChange={handleShipping}
+                    placeholder="Kathmandu"
+                    className={`${baseInputClass} px-4 ${errors.city ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'}`}
+                  />
+                </FormField>
+
+                <FormField label="District" required error={errors.district}>
+                  <input
+                    name="district" value={shipping.district} onChange={handleShipping}
+                    placeholder="Kathmandu"
+                    className={`${baseInputClass} px-4 ${errors.district ? 'border-red-400 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-gray-900 focus:ring-gray-900'}`}
+                  />
+                </FormField>
+
+                <div className="md:col-span-2">
+                  <FormField label="Province">
+                    <select
+                      name="province" value={shipping.province} onChange={handleShipping}
+                      className={`${baseInputClass} px-4 border-gray-200 focus:border-gray-900 focus:ring-gray-900 cursor-pointer`}
+                    >
+                      {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </FormField>
+                </div>
+
+                <div className="md:col-span-2 mb-0">
+                  <FormField label="Delivery Notes (Optional)">
+                    <textarea
+                      name="notes" value={shipping.notes} onChange={handleShipping}
+                      placeholder="Landmark, building name, floor, or special instructions..."
+                      rows={2}
+                      className={`${baseInputClass} px-4 border-gray-200 focus:border-gray-900 focus:ring-gray-900 resize-none`}
+                    />
+                  </FormField>
+                </div>
+              </div>
+            </section>
+
+            {/* Payment Section */}
+            <section className="bg-white border border-gray-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-900">
+                  <Lock className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 font-display">Payment Method</h2>
+                  <p className="text-sm text-gray-500 font-medium">Secure local payment gateways</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <PaymentCard
+                  id="esewa" selected={paymentMethod} onSelect={setPaymentMethod}
+                  logo="eSewa" name="eSewa" desc="Pay securely using your eSewa wallet"
+                  colorClass="text-[#60BB46] bg-[#60BB46]" ringClass="border-[#60BB46] ring-[#60BB46]"
+                />
+                <PaymentCard
+                  id="khalti" selected={paymentMethod} onSelect={setPaymentMethod}
+                  logo="Khalti" name="Khalti" desc="Pay securely using your Khalti wallet"
+                  colorClass="text-[#5C2D91] bg-[#5C2D91]" ringClass="border-[#5C2D91] ring-[#5C2D91]"
+                />
+                <PaymentCard
+                  id="cod" selected={paymentMethod} onSelect={setPaymentMethod}
+                  logo="COD" name="Cash on Delivery" desc="Pay cash when your book arrives"
+                  colorClass="text-gray-900 bg-gray-900" ringClass="border-gray-900 ring-gray-900"
+                />
+              </div>
+
+              <div className="mt-6 bg-gray-50 rounded-xl p-4 flex items-center gap-3 border border-gray-100">
+                <Lock className="w-4 h-4 text-gray-400" />
+                <p className="text-xs font-medium text-gray-500">
+                  Payments are processed securely. We do not store your credentials.
+                </p>
+              </div>
+            </section>
+          </div>
+
+          {/* ── RIGHT COLUMN: SUMMARY ── */}
+          <div className="lg:col-span-5 xl:col-span-4 lg:sticky lg:top-24">
+            <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-xl shadow-gray-200/40">
+
+              {/* Dynamic Book Preview */}
+              <div className={`w-full bg-gray-100 flex items-center justify-center overflow-hidden
+                ${book?.book_type === 'luxury' ? 'aspect-square' : 'aspect-video'}`}>
+                {book?.cover_image_url ? (
+                  <img src={book.cover_image_url} alt={book.title} className="w-full h-full object-cover" />
+                ) : (
+                  <BookOpen className="w-12 h-12 text-gray-300" />
+                )}
+              </div>
+
+              <div className="p-6 sm:p-8">
+                <h3 className="text-xl font-bold text-gray-900 mb-1 font-display truncate">
+                  {book?.title || "Untitled Book"}
+                </h3>
+                <p className="text-sm font-medium text-gray-500 mb-6">
+                  {book?.destination || "Photo Book"} · <span className="capitalize">{book?.book_type || "Hardcover"}</span>
+                </p>
+
+                {/* Pricing Breakdown */}
+                <div className="space-y-4 pt-6 border-t border-dashed border-gray-200">
+                  <div className="flex justify-between text-sm font-medium text-gray-600">
+                    <span>Photo Book ({book?.book_type})</span>
+                    <span className="text-gray-900 font-bold">Rs. {price.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-medium text-gray-600">
+                    <span>Delivery (Nepal)</span>
+                    <span className="text-gray-900 font-bold">Rs. {shipping_charge}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-end pt-6 mt-6 border-t border-gray-200">
+                  <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">Total</span>
+                  <span className="text-3xl font-black text-rose-500 font-display">Rs. {total.toLocaleString()}</span>
+                </div>
+
+                {serverError && (
+                  <div className="mt-6 bg-red-50 text-red-600 border border-red-100 rounded-xl px-4 py-3 text-sm font-medium flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    {serverError}
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className="w-full mt-8 bg-gray-900 text-white rounded-2xl py-4 text-sm font-bold hover:bg-rose-500 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {paymentMethod === "cod" ? "Confirming Order..." : "Redirecting securely..."}
+                    </>
+                  ) : (
+                    <>
+                      {paymentMethod === "cod" ? "Place Order (COD)" : `Pay via ${paymentMethod === "esewa" ? "eSewa" : "Khalti"}`}
+                    </>
+                  )}
+                </button>
+
+                <div className="mt-6 bg-emerald-50 rounded-xl p-4 flex items-center gap-3 border border-emerald-100">
+                  <Truck className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+                  <p className="text-xs font-bold text-emerald-800 leading-snug">
+                    Standard delivery takes 5–10 business days anywhere in Nepal.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
-      </div>
+      </main>
     </div>
   );
 };

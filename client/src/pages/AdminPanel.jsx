@@ -1,605 +1,412 @@
 // client/src/pages/AdminPanel.jsx
-// Blushbook — Admin Dashboard
+// BlushBook — Production Admin Command Center
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpen, Users, ShoppingBag, DollarSign,
-  Package, ChevronLeft, Eye, TrendingUp,
-  Clock, CheckCircle, Truck
+  Users, ShoppingBag, Package,
+  TrendingUp, Clock, CheckCircle, Truck,
+  AlertCircle, ChevronLeft, ChevronRight, Search
 } from "lucide-react";
-import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import { useAuth } from "../context/AuthContext";
+import AppNavbar from "../design-system/AppNavbar";
 
+// ─── REUSABLE COMPONENTS ──────────────────────────────────
+const AdminStatCard = ({ title, value, subtext, icon, trend }) => (
+  <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm flex flex-col relative overflow-hidden">
+    <div className="flex justify-between items-start mb-4">
+      <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-900 border border-gray-100">
+        {icon}
+      </div>
+      {trend && (
+        <span className="text-[11px] font-bold bg-green-50 text-green-700 px-2.5 py-1 rounded-full uppercase tracking-wider">
+          {trend}
+        </span>
+      )}
+    </div>
+    <h3 className="text-3xl font-black text-gray-900 font-display mb-1 tracking-tight">
+      {value}
+    </h3>
+    <p className="text-sm font-bold text-gray-900 mb-0.5">{title}</p>
+    <p className="text-xs font-medium text-gray-500">{subtext}</p>
+  </div>
+);
+
+// ─── MAIN ADMIN DASHBOARD ─────────────────────────────────
 const AdminPanel = () => {
-  const { user, logoutUser } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [orders, setOrders] = useState([]);
+
+  // State
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Data
+  const [stats, setStats] = useState(null);
+  const [ordersData, setOrdersData] = useState({ orders: [], total: 0, page: 1, pages: 1 });
   const [users, setUsers] = useState([]);
   const [books, setBooks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [updatingOrder, setUpdatingOrder] = useState(null);
 
-
-  const loadData = async () => {
+  // Fetch Data
+  const fetchDashboardData = async (page = 1) => {
+    setLoading(true);
     try {
-      const [ordersRes, usersRes, booksRes] = await Promise.all([
-        api.get("/admin/orders"),
-        api.get("/admin/users"),
+      const [statsRes, ordersRes, usersRes, booksRes] = await Promise.all([
+        api.get("/admin/orders/stats"),
+        api.get(`/admin/orders?page=${page}&limit=15`),
+        api.get("/admin/users"), 
         api.get("/admin/books"),
       ]);
-      setOrders(ordersRes.data);
+      
+      setStats(statsRes.data);
+      setOrdersData(ordersRes.data); 
       setUsers(usersRes.data);
       setBooks(booksRes.data);
     } catch (err) {
-      console.error("Admin load error:", err);
+      console.error("Admin data fetch failed:", err);
     } finally {
       setLoading(false);
     }
   };
+
   useEffect(() => {
-    loadData();
+    fetchDashboardData();
   }, []);
 
-  const updateOrderStatus = async (orderId, status) => {
-    setUpdatingOrder(orderId);
+  const updateOrderStatus = async (orderId, newStatus) => {
+    setUpdatingId(orderId);
     try {
-      await api.put(`/admin/orders/${orderId}`, { status });
-      setOrders(orders.map((o) =>
-        o.id === orderId ? { ...o, status } : o
-      ));
+      await api.patch(`/admin/orders/${orderId}/status`, { status: newStatus });
+      // Optimistically update UI
+      setOrdersData(prev => ({
+        ...prev,
+        orders: prev.orders.map(o => o.id === orderId ? { ...o, order_status: newStatus } : o)
+      }));
+      // Refresh stats quietly in background
+      api.get("/admin/orders/stats").then(res => setStats(res.data));
     } catch (err) {
+      alert("Failed to update status");
       console.error(err);
     } finally {
-      setUpdatingOrder(null);
+      setUpdatingId(null);
     }
   };
 
-  const totalRevenue = orders
-    .filter((o) => o.status !== "pending")
-    .reduce((sum, o) => sum + parseFloat(o.total_price || 0), 0);
-
-  const statusConfig = {
-    pending: { label: "Pending", class: "bg-yellow-50 text-yellow-600 border border-yellow-100" },
-    paid: { label: "Paid", class: "bg-blue-50 text-blue-600 border border-blue-100" },
-    shipped: { label: "Shipped", class: "bg-purple-50 text-purple-600 border border-purple-100" },
-    delivered: { label: "Delivered", class: "bg-green-50 text-green-600 border border-green-100" },
-  };
-
-  const stats = [
-    {
-      label: "Total Revenue",
-      value: `$${totalRevenue.toFixed(2)}`,
-      icon: <DollarSign className="w-5 h-5 text-green-500" />,
-      bg: "bg-green-50",
-      sub: `${orders.filter((o) => o.status !== "pending").length} paid orders`,
-    },
-    {
-      label: "Total Orders",
-      value: orders.length,
-      icon: <ShoppingBag className="w-5 h-5 text-blue-500" />,
-      bg: "bg-blue-50",
-      sub: `${orders.filter((o) => o.status === "pending").length} pending`,
-    },
-    {
-      label: "Total Users",
-      value: users.length,
-      icon: <Users className="w-5 h-5 text-rose-500" />,
-      bg: "bg-rose-50",
-      sub: "registered accounts",
-    },
-    {
-      label: "Total Books",
-      value: books.length,
-      icon: <BookOpen className="w-5 h-5 text-purple-500" />,
-      bg: "bg-purple-50",
-      sub: `${books.filter((b) => b.status === "ordered").length} ordered`,
-    },
-  ];
-
   const tabs = [
     { id: "overview", label: "Overview", icon: <TrendingUp className="w-4 h-4" /> },
-    { id: "orders", label: "Orders", icon: <ShoppingBag className="w-4 h-4" /> },
-    { id: "users", label: "Users", icon: <Users className="w-4 h-4" /> },
-    { id: "books", label: "Books", icon: <BookOpen className="w-4 h-4" /> },
+    { id: "orders", label: "Orders Ledger", icon: <ShoppingBag className="w-4 h-4" /> },
+    { id: "users", label: "Customer Base", icon: <Users className="w-4 h-4" /> },
   ];
 
-  if (loading) {
+  // ✅ Added cancellation_requested color mapping
+  const STATUS_COLORS = {
+    pending: "bg-yellow-50 text-yellow-700 ring-yellow-200",
+    confirmed: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    printing: "bg-blue-50 text-blue-700 ring-blue-200",
+    shipped: "bg-purple-50 text-purple-700 ring-purple-200",
+    delivered: "bg-green-50 text-green-700 ring-green-200",
+    cancelled: "bg-red-50 text-red-700 ring-red-200",
+    cancellation_requested: "bg-orange-50 text-orange-700 ring-orange-200",
+  };
+
+  if (loading && !stats) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-10 h-10 border-4 border-rose-300 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mb-4" />
+        <p className="text-gray-500 font-medium text-sm">Loading Command Center...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#FAFAFA] font-sans flex flex-col">
+      <AppNavbar 
+        title="Admin Command Center" 
+        backTo="/dashboard" 
+        backLabel="Exit Admin" 
+      />
 
-      {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-8 py-4 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 text-sm transition"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Dashboard
-          </button>
-          <div className="w-px h-4 bg-gray-200" />
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 bg-rose-500 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
-            <span
-              className="font-bold text-gray-900"
-              style={{ fontFamily: "Georgia, serif" }}
-            >
-              blush<span className="text-rose-500">book</span>
-            </span>
+      <main className="flex-1 w-full max-w-7xl mx-auto px-4 md:px-8 py-8">
+        
+        {/* ─── HEADER & TABS ─── */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900 font-display tracking-tight mb-2">
+              System Overview
+            </h1>
+            <p className="text-sm font-medium text-gray-500">
+              Welcome back, Admin. Here is what's happening today.
+            </p>
           </div>
-          <span className="text-gray-300">·</span>
-          <span className="text-gray-500 text-sm font-medium">Admin Panel</span>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center">
-            <span className="text-rose-500 text-sm font-bold">
-              {user?.name?.charAt(0).toUpperCase()}
-            </span>
+          
+          <div className="flex bg-white border border-gray-200 p-1.5 rounded-full shadow-sm overflow-x-auto hide-scrollbar">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold transition-colors whitespace-nowrap
+                  ${activeTab === tab.id 
+                    ? "bg-gray-900 text-white shadow-md" 
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
           </div>
-          <span className="text-gray-600 text-sm">{user?.name}</span>
-          <button
-            onClick={() => { logoutUser(); navigate("/login"); }}
-            className="text-gray-400 hover:text-red-500 text-sm transition"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto px-6 py-10">
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1
-            className="text-3xl font-bold text-gray-900 mb-1"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            Admin Dashboard
-          </h1>
-          <p className="text-gray-400 text-sm">
-            Manage orders, users, and books from one place
-          </p>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
-            <div
-              key={stat.label}
-              className="bg-white rounded-2xl p-5 shadow-card"
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`w-10 h-10 ${stat.bg} rounded-xl flex items-center justify-center`}>
-                  {stat.icon}
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-gray-900 mb-0.5">
-                {stat.value}
-              </p>
-              <p className="text-xs text-gray-400">{stat.label}</p>
-              <p className="text-xs text-gray-300 mt-0.5">{stat.sub}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition
-                ${activeTab === tab.id
-                  ? "bg-gray-900 text-white"
-                  : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-100"
-                }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* ── OVERVIEW TAB ── */}
+        {/* ─── OVERVIEW TAB ─── */}
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-            {/* Recent Orders */}
-            <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center">
-                <h3 className="font-bold text-gray-800">Recent Orders</h3>
-                <button
-                  onClick={() => setActiveTab("orders")}
-                  className="text-rose-500 text-xs font-medium hover:underline"
-                >
-                  View all
-                </button>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {orders.slice(0, 5).map((order) => (
-                  <div key={order.id} className="px-6 py-4 flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-gray-800 text-sm">
-                        {order.title || `Order #${order.id}`}
-                      </p>
-                      <p className="text-gray-400 text-xs">
-                        {order.shipping_name} · {new Date(order.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-gray-800 text-sm">
-                        ${order.total_price}
-                      </p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusConfig[order.status]?.class}`}>
-                        {statusConfig[order.status]?.label}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-                {orders.length === 0 && (
-                  <div className="px-6 py-8 text-center text-gray-300 text-sm">
-                    No orders yet
-                  </div>
-                )}
-              </div>
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+            
+            {/* Real-time Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <AdminStatCard 
+                title="Total Revenue" 
+                value={`Rs. ${Number(stats?.total_revenue || 0).toLocaleString()}`} 
+                subtext="Gross volume (paid orders)" 
+                icon={<TrendingUp className="w-6 h-6" />} 
+                trend="Live"
+              />
+              <AdminStatCard 
+                title="Active Orders" 
+                value={Number(stats?.pending || 0) + Number(stats?.printing || 0)} 
+                subtext="Requires fulfillment action" 
+                icon={<Clock className="w-6 h-6" />} 
+              />
+              <AdminStatCard 
+                title="Shipped/Delivered" 
+                value={Number(stats?.shipped || 0) + Number(stats?.delivered || 0)} 
+                subtext="Successfully dispatched" 
+                icon={<Truck className="w-6 h-6" />} 
+              />
+              <AdminStatCard 
+                title="Total Customers" 
+                value={users.length} 
+                subtext="Registered accounts" 
+                icon={<Users className="w-6 h-6" />} 
+              />
             </div>
 
-            {/* Recent Users */}
-            <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center">
-                <h3 className="font-bold text-gray-800">Recent Users</h3>
-                <button
-                  onClick={() => setActiveTab("users")}
-                  className="text-rose-500 text-xs font-medium hover:underline"
-                >
-                  View all
-                </button>
-              </div>
-              <div className="divide-y divide-gray-50">
-                {users.slice(0, 5).map((u) => (
-                  <div key={u.id} className="px-6 py-4 flex items-center gap-3">
-                    <div className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-rose-500 text-sm font-bold">
-                        {u.name?.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-800 text-sm">{u.name}</p>
-                      <p className="text-gray-400 text-xs">{u.email}</p>
-                    </div>
-                    <p className="ml-auto text-gray-300 text-xs">
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
-                {users.length === 0 && (
-                  <div className="px-6 py-8 text-center text-gray-300 text-sm">
-                    No users yet
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Order Status Breakdown */}
-            <div className="bg-white rounded-2xl shadow-card p-6">
-              <h3 className="font-bold text-gray-800 mb-5">Order Status</h3>
-              <div className="space-y-4">
-                {[
-                  { status: "pending", icon: <Clock className="w-4 h-4 text-yellow-500" />, label: "Pending", color: "bg-yellow-400" },
-                  { status: "paid", icon: <CheckCircle className="w-4 h-4 text-blue-500" />, label: "Paid", color: "bg-blue-400" },
-                  { status: "shipped", icon: <Truck className="w-4 h-4 text-purple-500" />, label: "Shipped", color: "bg-purple-400" },
-                  { status: "delivered", icon: <Package className="w-4 h-4 text-green-500" />, label: "Delivered", color: "bg-green-400" },
-                ].map((item) => {
-                  const count = orders.filter((o) => o.status === item.status).length;
-                  const pct = orders.length > 0 ? (count / orders.length) * 100 : 0;
-                  return (
-                    <div key={item.status}>
-                      <div className="flex justify-between items-center mb-1">
-                        <div className="flex items-center gap-2">
-                          {item.icon}
-                          <span className="text-sm text-gray-600">{item.label}</span>
-                        </div>
-                        <span className="text-sm font-bold text-gray-800">{count}</span>
+            {/* Quick Action Boards */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              
+              {/* Needs Attention */}
+              <div className="bg-white border border-gray-200 rounded-3xl p-6 md:p-8 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-lg font-bold text-gray-900 font-display">Needs Attention</h2>
+                  <button onClick={() => setActiveTab("orders")} className="text-xs font-bold text-rose-500 hover:text-rose-600">View All</button>
+                </div>
+                
+                <div className="space-y-4">
+                  {ordersData.orders.filter(o => o.order_status === "pending" || o.order_status === "confirmed" || o.order_status === "cancellation_requested").slice(0, 5).map(order => (
+                    <div key={order.id} className="flex items-center justify-between p-4 rounded-2xl bg-gray-50 border border-gray-100">
+                      <div>
+                        <p className="text-sm font-bold text-gray-900 mb-0.5">Order #{String(order.id).padStart(5, '0')}</p>
+                        <p className="text-xs font-medium text-gray-500">{order.shipping_name} • Rs. {order.amount_npr}</p>
                       </div>
-                      <div className="w-full bg-gray-100 rounded-full h-1.5">
-                        <div
-                          className={`${item.color} h-1.5 rounded-full transition-all`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
+                      <select
+                        value={order.order_status}
+                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                        disabled={updatingId === order.id}
+                        className="text-xs font-bold bg-white border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-gray-900 cursor-pointer"
+                      >
+                        {order.order_status === "cancellation_requested" && <option value="cancellation_requested" disabled>Cancel Req.</option>}
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="printing">Printing</option>
+                        <option value="shipped">Shipped</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
                     </div>
-                  );
-                })}
+                  ))}
+                  {ordersData.orders.filter(o => o.order_status === "pending" || o.order_status === "confirmed" || o.order_status === "cancellation_requested").length === 0 && (
+                    <p className="text-sm text-gray-400 font-medium py-4">No pending orders. You're all caught up!</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Revenue Card */}
-            <div className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-6 text-white">
-              <h3 className="font-bold mb-1">Total Revenue</h3>
-              <p className="text-4xl font-bold mt-4 mb-1">
-                ${totalRevenue.toFixed(2)}
-              </p>
-              <p className="text-rose-200 text-sm">
-                From {orders.filter((o) => o.status !== "pending").length} completed orders
-              </p>
-              <div className="mt-6 pt-6 border-t border-rose-400">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-rose-200 text-xs">Avg Order Value</p>
-                    <p className="font-bold text-lg">
-                      ${orders.length > 0
-                        ? (totalRevenue / orders.length).toFixed(2)
-                        : "0.00"}
-                    </p>
+              {/* System Health / Recent Activity */}
+              <div className="bg-gray-900 rounded-3xl p-6 md:p-8 shadow-sm text-white">
+                <h2 className="text-lg font-bold font-display mb-6">System Health</h2>
+                <div className="space-y-6">
+                  <div className="flex justify-between items-center border-b border-gray-800 pb-4">
+                    <span className="text-sm font-medium text-gray-400">Database Connection</span>
+                    <span className="flex items-center gap-2 text-xs font-bold text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full"><div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/> Online</span>
                   </div>
-                  <div>
-                    <p className="text-rose-200 text-xs">This Month</p>
-                    <p className="font-bold text-lg">
-                      ${orders
-                        .filter((o) => {
-                          const d = new Date(o.created_at);
-                          const now = new Date();
-                          return d.getMonth() === now.getMonth() &&
-                            d.getFullYear() === now.getFullYear();
-                        })
-                        .reduce((s, o) => s + parseFloat(o.total_price || 0), 0)
-                        .toFixed(2)}
-                    </p>
+                  <div className="flex justify-between items-center border-b border-gray-800 pb-4">
+                    <span className="text-sm font-medium text-gray-400">Total Books Created</span>
+                    <span className="text-lg font-black">{books.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-gray-800 pb-4">
+                    <span className="text-sm font-medium text-gray-400">Conversion Rate</span>
+                    <span className="text-lg font-black">{books.length > 0 ? Math.round((stats?.total_paid / books.length) * 100) : 0}%</span>
                   </div>
                 </div>
               </div>
+
             </div>
           </div>
         )}
 
-        {/* ── ORDERS TAB ── */}
+        {/* ─── ORDERS LEDGER TAB ─── */}
         {activeTab === "orders" && (
-          <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-50">
-              <h3 className="font-bold text-gray-800">
-                All Orders
-                <span className="ml-2 text-sm font-normal text-gray-400">
-                  ({orders.length})
-                </span>
-              </h3>
+          <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-4">
+            <div className="p-6 md:p-8 border-b border-gray-100 flex flex-col md:flex-row justify-between md:items-center gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 font-display">Orders Ledger</h2>
+                <p className="text-sm font-medium text-gray-500 mt-1">Managing {ordersData.total} total orders.</p>
+              </div>
             </div>
+
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50">
-                    {["Order ID", "Customer", "Book", "Amount", "Status", "Date", "Actions"].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                        {h}
-                      </th>
-                    ))}
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Order ID</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Customer</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Item</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Amount</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Status</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50 transition">
-                      <td className="px-5 py-4 text-sm font-mono text-gray-400">
-                        #{order.id}
+                <tbody className="divide-y divide-gray-100">
+                  {ordersData.orders.map((order) => (
+                    <tr key={order.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4 align-top">
+                        <span className="text-sm font-bold text-gray-900 font-mono">#{String(order.id).padStart(5, '0')}</span>
+                        <br/>
+                        <span className="text-[11px] font-medium text-gray-400">{new Date(order.created_at).toLocaleDateString()}</span>
                       </td>
-                      <td className="px-5 py-4">
-                        <p className="text-sm font-medium text-gray-800">
-                          {order.shipping_name}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {order.shipping_city}, {order.shipping_country}
-                        </p>
+                      <td className="px-6 py-4 align-top">
+                        <p className="text-sm font-bold text-gray-900">{order.shipping_name}</p>
+                        <p className="text-xs font-medium text-gray-500 truncate max-w-[150px]">{order.shipping_city}, {order.shipping_district}</p>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
-                          {order.cover_image_url && (
-                            <img
-                              src={order.cover_image_url}
-                              alt=""
-                              className="w-8 h-8 object-cover rounded-lg"
-                            />
-                          )}
-                          <p className="text-sm text-gray-700 truncate max-w-28">
-                            {order.title}
-                          </p>
-                        </div>
+                      <td className="px-6 py-4 align-top">
+                        <p className="text-sm font-bold text-gray-900 truncate max-w-[150px]">{order.book_title}</p>
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">{order.book_type}</p>
+                        
+                        {/* ✅ CANCELLATION REASON RENDERED HERE */}
+                        {order.order_status === "cancellation_requested" && (
+                          <div className="bg-orange-50 border border-orange-200 rounded-lg p-2 mt-1 max-w-[200px]">
+                            <p className="text-[10px] font-bold text-orange-800 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" /> Cancel Reason:
+                            </p>
+                            <p className="text-xs font-medium text-orange-900 leading-snug">
+                              "{order.cancellation_reason || "No reason provided"}"
+                            </p>
+                          </div>
+                        )}
                       </td>
-                      <td className="px-5 py-4 text-sm font-bold text-gray-800">
-                        ${order.total_price}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${statusConfig[order.status]?.class}`}>
-                          {statusConfig[order.status]?.label}
+                      <td className="px-6 py-4 align-top">
+                        <p className="text-sm font-black text-gray-900">Rs. {order.amount_npr}</p>
+                        <span className={`text-[10px] font-bold uppercase tracking-wider ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
+                          {order.payment_method} ({order.payment_status})
                         </span>
                       </td>
-                      <td className="px-5 py-4 text-xs text-gray-400">
-                        {new Date(order.created_at).toLocaleDateString()}
+                      <td className="px-6 py-4 align-top">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ring-1 inset-ring ${STATUS_COLORS[order.order_status]}`}>
+                          {order.order_status === "cancellation_requested" ? "Cancel Req." : order.order_status}
+                        </span>
                       </td>
-                      <td className="px-5 py-4">
+                      <td className="px-6 py-4 align-top">
                         <select
-                          value={order.status}
+                          value={order.order_status}
                           onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                          disabled={updatingOrder === order.id}
-                          className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-rose-300 bg-white"
+                          disabled={updatingId === order.id}
+                          className="text-xs font-bold bg-white border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-gray-900 cursor-pointer w-full max-w-[120px]"
                         >
+                          {order.order_status === "cancellation_requested" && <option value="cancellation_requested" disabled>Cancel Req.</option>}
                           <option value="pending">Pending</option>
-                          <option value="paid">Paid</option>
+                          <option value="confirmed">Confirmed</option>
+                          <option value="printing">Printing</option>
                           <option value="shipped">Shipped</option>
                           <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
                         </select>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {orders.length === 0 && (
-                <div className="text-center py-12 text-gray-300 text-sm">
-                  No orders yet
-                </div>
-              )}
+            </div>
+            
+            {/* Pagination Controls */}
+            <div className="p-6 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                Page {ordersData.page} of {ordersData.pages}
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  disabled={ordersData.page === 1}
+                  onClick={() => fetchDashboardData(ordersData.page - 1)}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Previous
+                </button>
+                <button 
+                  disabled={ordersData.page === ordersData.pages}
+                  onClick={() => fetchDashboardData(ordersData.page + 1)}
+                  className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* ── USERS TAB ── */}
+        {/* ─── CUSTOMER BASE TAB ─── */}
         {activeTab === "users" && (
-          <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-50">
-              <h3 className="font-bold text-gray-800">
-                All Users
-                <span className="ml-2 text-sm font-normal text-gray-400">
-                  ({users.length})
-                </span>
-              </h3>
+          <div className="bg-white border border-gray-200 rounded-3xl overflow-hidden shadow-sm animate-in fade-in slide-in-from-bottom-4">
+            <div className="p-6 md:p-8 border-b border-gray-100 flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 font-display">Customer Base</h2>
+                <p className="text-sm font-medium text-gray-500 mt-1">Total registered accounts: {users.length}</p>
+              </div>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-gray-50">
-                    {["ID", "Name", "Email", "Joined", "Books"].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                        {h}
-                      </th>
-                    ))}
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">User</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Contact</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Joined</th>
+                    <th className="px-6 py-4 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">Books Created</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-gray-100">
                   {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-gray-50 transition">
-                      <td className="px-5 py-4 text-sm font-mono text-gray-400">
-                        #{u.id}
-                      </td>
-                      <td className="px-5 py-4">
+                    <tr key={u.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-rose-100 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-rose-500 text-xs font-bold">
-                              {u.name?.charAt(0).toUpperCase()}
-                            </span>
+                          <div className="w-10 h-10 bg-gray-100 border border-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                            <span className="text-gray-600 text-sm font-black">{u.name?.charAt(0).toUpperCase()}</span>
                           </div>
-                          <p className="text-sm font-medium text-gray-800">{u.name}</p>
+                          <div>
+                            <p className="text-sm font-bold text-gray-900">{u.name}</p>
+                            <span className="text-[10px] font-bold text-gray-400 font-mono">ID: {u.id}</span>
+                          </div>
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-gray-500">
-                        {u.email}
-                      </td>
-                      <td className="px-5 py-4 text-xs text-gray-400">
-                        {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-600">
-                        {books.filter((b) => b.user_id === u.id).length} books
+                      <td className="px-6 py-4 text-sm font-medium text-gray-600">{u.email}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-500">{new Date(u.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-sm font-black text-gray-900">
+                        {books.filter(b => b.user_id === u.id).length}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {users.length === 0 && (
-                <div className="text-center py-12 text-gray-300 text-sm">
-                  No users yet
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* ── BOOKS TAB ── */}
-        {activeTab === "books" && (
-          <div className="bg-white rounded-2xl shadow-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-50">
-              <h3 className="font-bold text-gray-800">
-                All Books
-                <span className="ml-2 text-sm font-normal text-gray-400">
-                  ({books.length})
-                </span>
-              </h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50">
-                    {["Book", "User", "Type", "Status", "Created", "Actions"].map((h) => (
-                      <th key={h} className="px-5 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                        {h}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {books.map((book) => (
-                    <tr key={book.id} className="hover:bg-gray-50 transition">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          {book.cover_image_url ? (
-                            <img
-                              src={book.cover_image_url}
-                              alt=""
-                              className="w-10 h-8 object-cover rounded-lg"
-                            />
-                          ) : (
-                            <div className="w-10 h-8 bg-rose-50 rounded-lg flex items-center justify-center">
-                              <BookOpen className="w-4 h-4 text-rose-300" />
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-gray-800 truncate max-w-32">
-                              {book.title}
-                            </p>
-                            <p className="text-xs text-gray-400 truncate max-w-32">
-                              {book.destination}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-4 text-sm text-gray-500">
-                        User #{book.user_id}
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full capitalize">
-                          {book.book_type}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4">
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold
-                          ${book.status === "draft" ? "bg-yellow-50 text-yellow-600 border border-yellow-100"
-                          : book.status === "complete" ? "bg-blue-50 text-blue-600 border border-blue-100"
-                          : "bg-green-50 text-green-600 border border-green-100"}`}>
-                          {book.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-xs text-gray-400">
-                        {new Date(book.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-5 py-4">
-                        <button
-                          onClick={() => navigate(`/preview/${book.id}`)}
-                          className="flex items-center gap-1 text-xs text-gray-400 hover:text-rose-500 transition font-medium"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {books.length === 0 && (
-                <div className="text-center py-12 text-gray-300 text-sm">
-                  No books yet
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      </main>
     </div>
   );
 };

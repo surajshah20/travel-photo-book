@@ -5,31 +5,33 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Star, Check, Plus, Minus,
-  Truck, Shield, Headphones, ChevronRight,
+  Truck, Shield, ChevronRight,
   Wand2, Pen, Download, Layers, ArrowRight,
-  MapPin, CreditCard, Package, Sparkles, Menu, X
+  MapPin, CreditCard, Package, Sparkles, Menu, X, ShieldCheck, LifeBuoy
 } from "lucide-react";
 import heroImage from "../assets/herosection.jpg";
 import book1 from "../assets/maldeis.jpg";
 import book3 from "../assets/thailand.jpg";
 import book4 from "../assets/lovestory.jpg";
 import qualityImage from "../assets/book1.jpg";
+import Logo from "../design-system/Logo";
+import { C } from "../design-system/index";
 
 /* ─── DESIGN TOKENS ──────────────────────────────────────── */
-const C = {
-  rose:    "#C8345A",
-  roseHov: "#A8284A",
-  roseSoft:"#FFF0F4",
-  roseMid: "#F9D0DA",
-  ink:     "#0F0F0F",
-  ink2:    "#1C1C1C",
-  muted:   "#6B6B6B",
-  subtle:  "#9A9A9A",
-  line:    "#EBEBEB",
-  bg:      "#FFFFFF",
-  bgSoft:  "#FAFAFA",
-  bgBlush: "#FEF6F8",
-};
+// const C = {
+//   rose:    "#C8345A",
+//   roseHov: "#A8284A",
+//   roseSoft:"#FFF0F4",
+//   roseMid: "#F9D0DA",
+//   ink:     "#0F0F0F",
+//   ink2:    "#1C1C1C",
+//   muted:   "#6B6B6B",
+//   subtle:  "#9A9A9A",
+//   line:    "#EBEBEB",
+//   bg:      "#FFFFFF",
+//   bgSoft:  "#FAFAFA",
+//   bgBlush: "#FEF6F8",
+// };
 
 /* ─── GLOBAL STYLES ──────────────────────────────────────── */
 const globalStyle = `
@@ -222,17 +224,17 @@ const RevealCard = ({ children, delay = 0, style = {}, className = "" }) => {
 };
 
 /* ─── LOGO ───────────────────────────────────────────────── */
-const Logo = ({ size = 22, dark = false }) => (
-  <span style={{
-    fontFamily: "'Plus Jakarta Sans', sans-serif",
-    fontSize: size, letterSpacing: "-0.03em",
-    lineHeight: 1, userSelect: "none",
-  }}>
-    <span style={{ fontWeight: 300, color: dark ? "#fff" : C.ink }}>blush</span>
-    <span style={{ fontWeight: 800, color: dark ? "#fff" : C.ink }}>book</span>
-    <span style={{ fontWeight: 800, color: C.rose, marginLeft: 2 }}>•</span>
-  </span>
-);
+// const Logo = ({ size = 22, dark = false }) => (
+//   <span style={{
+//     fontFamily: "'Plus Jakarta Sans', sans-serif",
+//     fontSize: size, letterSpacing: "-0.03em",
+//     lineHeight: 1, userSelect: "none",
+//   }}>
+//     <span style={{ fontWeight: 300, color: dark ? "#fff" : C.ink }}>blush</span>
+//     <span style={{ fontWeight: 800, color: dark ? "#fff" : C.ink }}>book</span>
+//     <span style={{ fontWeight: 800, color: C.rose, marginLeft: 2 }}>•</span>
+//   </span>
+// );
 
 /* ─── TRUST BADGE ────────────────────────────────────────── */
 const TrustBadge = ({ icon, text }) => (
@@ -1115,24 +1117,93 @@ const LandingPage = () => {
         </section>
 
         {/* ── TRUST BAR ────────────────────────────────── */}
-        <section style={{ background: C.bg, padding: "52px 48px", borderTop: `1px solid ${C.line}` }}>
+        <section
+          style={{
+            background: C.bg,
+            padding: "60px 48px",
+            borderTop: `1px solid ${C.line}`,
+          }}
+        >
           <div
-            style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 32, textAlign: "center" }}
+            style={{
+              maxWidth: 1000,
+              margin: "0 auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 32,
+            }}
             className="grid-3col"
           >
             {[
-              { icon: <Truck size={22} color={C.rose} />, title: "Free delivery", desc: "All orders over Rs. 2,000 ship free within Nepal" },
-              { icon: <Shield size={22} color={C.rose} />, title: "100% satisfaction", desc: "Not happy? We reprint or refund — no questions asked" },
-              { icon: <Headphones size={22} color={C.rose} />, title: "Nepal support", desc: "Local customer support in Nepali and English" },
+              {
+                icon: <Truck size={22} color={C.rose} />,
+                title: "Free Delivery",
+                desc: "All orders above Rs. 2,000 ship free anywhere in Nepal.",
+              },
+              {
+                icon: <ShieldCheck size={22} color={C.rose} />,
+                title: "100% Satisfaction",
+                desc: "Love your book or we'll reprint it or refund you.",
+              },
+              {
+                icon: <LifeBuoy size={22} color={C.rose} />,
+                title: "Local Support",
+                desc: "Friendly customer support available in Nepali and English.",
+              },
             ].map((item) => (
-              <div key={item.title}>
-                <div style={{ marginBottom: 10 }}>{item.icon}</div>
-                <h4 style={{ fontWeight: 700, fontSize: 14, color: C.ink, margin: "0 0 5px" }}>
-                  {item.title}
-                </h4>
-                <p style={{ fontSize: 12.5, color: C.subtle, lineHeight: 1.6, margin: 0 }}>
-                  {item.desc}
-                </p>
+              <div
+                key={item.title}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 16,
+                  padding: "20px",
+                  borderRadius: 18,
+                  transition: "all 0.25s ease",
+                }}
+              >
+                {/* Icon Badge */}
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    background: `${C.rose}12`,
+                    border: `1px solid ${C.rose}20`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.icon}
+                </div>
+
+                {/* Content */}
+                <div>
+                  <h4
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 15,
+                      color: C.ink,
+                      margin: "0 0 6px",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
+                    {item.title}
+                  </h4>
+
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: C.subtle,
+                      lineHeight: 1.65,
+                      margin: 0,
+                    }}
+                  >
+                    {item.desc}
+                  </p>
+                </div>
               </div>
             ))}
           </div>

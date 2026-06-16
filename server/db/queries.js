@@ -14,12 +14,20 @@ const findUserById = (id) =>
 // ─── BOOK QUERIES ─────────────────────────────────────────
 
 // Get all books for a user
+// Replace just the getBooksByUser function in db/queries.js
+
 const getBooksByUser = (userId) =>
   db.query(
-    "SELECT * FROM books WHERE user_id = $1 ORDER BY updated_at DESC",
+    `SELECT b.*, COUNT(p.id)::int AS photo_count
+     FROM books b
+     LEFT JOIN photos p ON p.book_id = b.id
+     WHERE b.user_id = $1
+       AND b.deleted_at IS NULL
+     GROUP BY b.id
+     ORDER BY b.updated_at DESC`,
     [userId]
   );
-
+  
 // Get a single book by ID
 const getBookById = (bookId) =>
   db.query("SELECT * FROM books WHERE id = $1", [bookId]);

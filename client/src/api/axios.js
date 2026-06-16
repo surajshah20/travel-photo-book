@@ -1,22 +1,32 @@
 // client/src/api/axios.js
-// One central place to configure all API calls
-// Instead of typing the full URL every time, we just use api.post("/auth/login")
 
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  timeout: 30000,
+  withCredentials: true, // ✅ CRITICAL: Allows browser to send secure cookies
 });
 
-// This runs before every request automatically
-// It grabs the token from localStorage and adds it to the header
-// So protected routes know we're logged in
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+// Handle expired/invalid tokens globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid — clear local user data
+      localStorage.removeItem("user");
+      // Note: We don't need to remove the token here anymore, the browser handles it
+
+      // Only redirect if not already on an auth page
+      const onAuthPage = ["/login", "/register", "/"].includes(
+        window.location.pathname
+      );
+      if (!onAuthPage) {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 export default api;

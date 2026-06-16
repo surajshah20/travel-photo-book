@@ -6,41 +6,42 @@ import { useNavigate, Link } from "react-router-dom";
 import {
   BookOpen, Plus, Trash2, Edit3, Eye,
   ShoppingBag, LogOut, Clock, CheckCircle,
-  Package, Download, ChevronRight, Images,
-  Sparkles, User
+  Package, ChevronRight, Images, MoreVertical,
+  Calendar, MapPin
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
+import AppNavbar from "../design-system/AppNavbar";
 
-// ─── Reusable Components ──────────────────────────────────
+// ─── REUSABLE COMPONENTS ──────────────────────────────────
 
-const StatCard = ({ icon, value, label, bg }) => (
-  <div className="bg-white rounded-2xl p-5 border border-gray-100 flex items-center gap-4 hover:shadow-md transition">
-    <div className={`w-11 h-11 ${bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
+const StatCard = ({ icon, value, label }) => (
+  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+    <div className="w-12 h-12 rounded-xl bg-gray-50 text-gray-600 flex items-center justify-center flex-shrink-0">
       {icon}
     </div>
     <div>
-      <p className="text-2xl font-bold text-gray-900 leading-none mb-0.5">{value}</p>
-      <p className="text-gray-400 text-xs">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{value}</p>
+      <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">{label}</p>
     </div>
   </div>
 );
 
 const StatusBadge = ({ status }) => {
   const config = {
-    draft: { label: "Draft", class: "bg-amber-50 text-amber-600 border border-amber-100" },
-    complete: { label: "Ready", class: "bg-green-50 text-green-600 border border-green-100" },
-    ordered: { label: "Ordered", class: "bg-blue-50 text-blue-600 border border-blue-100" },
+    draft: { label: "Draft", classes: "bg-gray-100 text-gray-600" },
+    complete: { label: "Ready to Print", classes: "bg-green-100 text-green-700" },
+    ordered: { label: "Ordered", classes: "bg-blue-100 text-blue-700" },
   };
-  const s = config[status] || { label: status, class: "bg-gray-50 text-gray-500 border border-gray-100" };
+  const s = config[status] || { label: status, classes: "bg-gray-100 text-gray-600" };
   return (
-    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${s.class}`}>
+    <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${s.classes}`}>
       {s.label}
     </span>
   );
 };
 
-// ─── Main Dashboard ───────────────────────────────────────
+// ─── MAIN DASHBOARD ───────────────────────────────────────
 const Home = () => {
   const { user, logoutUser } = useAuth();
   const navigate = useNavigate();
@@ -50,7 +51,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -72,7 +72,7 @@ const Home = () => {
 
   const handleDelete = async (bookId, e) => {
     e.stopPropagation();
-    if (!window.confirm("Delete this book? This cannot be undone.")) return;
+    if (!window.confirm("Are you sure you want to delete this book? This cannot be undone.")) return;
     setDeletingId(bookId);
     try {
       await api.delete(`/books/${bookId}`);
@@ -84,582 +84,322 @@ const Home = () => {
     }
   };
 
-  const handleLogout = () => {
-    logoutUser();
-    navigate("/login");
-  };
-
   const filteredBooks = activeFilter === "all"
     ? books
     : books.filter((b) => b.status === activeFilter);
 
-  const recentBooks = books.slice(0, 8);
-
-  const stats = [
-    {
-      label: "Total Books",
-      value: books.length,
-      icon: <Images className="w-5 h-5 text-rose-500" />,
-      bg: "bg-rose-50",
-    },
-    {
-      label: "In Progress",
-      value: books.filter((b) => b.status === "draft").length,
-      icon: <Clock className="w-5 h-5 text-amber-500" />,
-      bg: "bg-amber-50",
-    },
-    {
-      label: "Completed",
-      value: books.filter((b) => b.status === "complete").length,
-      icon: <CheckCircle className="w-5 h-5 text-green-500" />,
-      bg: "bg-green-50",
-    },
-    {
-      label: "Orders",
-      value: orders.length,
-      icon: <Package className="w-5 h-5 text-blue-500" />,
-      bg: "bg-blue-50",
-    },
-  ];
-
   const filters = [
-    { id: "all", label: "All" },
+    { id: "all", label: "All Books" },
     { id: "draft", label: "In Progress" },
     { id: "complete", label: "Ready to Order" },
     { id: "ordered", label: "Ordered" },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: "Inter, sans-serif" }}>
+    <div className="min-h-screen bg-[#FAFAFA] font-sans">
+      <AppNavbar />
 
-      {/* ─── NAVBAR ─────────────────────────────────────── */}
-      <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3.5 flex justify-between items-center">
-
-          {/* Logo */}
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => navigate("/")}
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        
+        {/* ─── HEADER AREA ─────────────────────────────────── */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight font-display mb-2">
+              Welcome back, {user?.name?.split(" ")[0]}
+            </h1>
+            <p className="text-gray-500 text-sm">
+              Manage your photo books and track your recent orders.
+            </p>
+          </div>
+          <button
+            onClick={() => navigate("/create")}
+            className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-rose-500 transition-colors shadow-sm"
           >
-            <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
-            <span
-              className="text-xl font-bold text-gray-900"
-              style={{ fontFamily: "Georgia, serif" }}
-            >
-              blush<span className="text-rose-500">book</span>
-            </span>
-          </div>
+            <Plus className="w-4 h-4" />
+            Create New Book
+          </button>
+        </header>
 
-          {/* Desktop nav */}
-          <div className="hidden md:flex items-center gap-1">
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-rose-600 bg-rose-50"
-            >
-              <Images className="w-4 h-4" />
-              My Books
-            </button>
-            <Link
-              to="/orders"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition"
-            >
-              <ShoppingBag className="w-4 h-4" />
-              Orders
-            </Link>
-          </div>
-
-          {/* Right side */}
-          <div className="flex items-center gap-3">
-            {/* Create button — always visible */}
-            <button
-              onClick={() => navigate("/create")}
-              className="hidden md:flex items-center gap-2 bg-rose-500 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-rose-600 transition shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Book
-            </button>
-
-            {/* User avatar */}
-            <div className="relative">
-              <button
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="flex items-center gap-2.5 pl-2 pr-3 py-1.5 rounded-full border border-gray-100 hover:border-gray-200 transition"
-              >
-                <div className="w-7 h-7 bg-rose-100 rounded-full flex items-center justify-center">
-                  <span className="text-rose-600 text-xs font-bold">
-                    {user?.name?.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-gray-700 text-sm font-medium hidden sm:block max-w-24 truncate">
-                  {user?.name?.split(" ")[0]}
-                </span>
-              </button>
-
-              {/* Dropdown */}
-              {mobileMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50">
-                  <div className="px-4 py-3 border-b border-gray-50">
-                    <p className="text-sm font-semibold text-gray-800">{user?.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{user?.email}</p>
-                  </div>
-                  <div className="py-1">
-                    <button
-                      onClick={() => { navigate("/dashboard"); setMobileMenuOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition"
-                    >
-                      <Images className="w-4 h-4 text-gray-400" />
-                      My Books
-                    </button>
-                    <button
-                      onClick={() => { navigate("/orders"); setMobileMenuOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition"
-                    >
-                      <ShoppingBag className="w-4 h-4 text-gray-400" />
-                      My Orders
-                    </button>
-                    <button
-                      onClick={() => { navigate("/create"); setMobileMenuOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition"
-                    >
-                      <Plus className="w-4 h-4 text-gray-400" />
-                      Create New Book
-                    </button>
-                  </div>
-                  <div className="border-t border-gray-50 py-1">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* ─── MAIN CONTENT ───────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-
-        {/* ─── HERO CTA ─────────────────────────────────── */}
-        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 mb-8 relative overflow-hidden">
-          {/* Decorative */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-rose-500/10 rounded-full translate-x-1/3 -translate-y-1/3" />
-          <div className="absolute bottom-0 left-1/2 w-40 h-40 bg-rose-500/5 rounded-full" />
-
-          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-rose-400" />
-                <span className="text-rose-400 text-xs font-semibold uppercase tracking-widest">
-                  Welcome back
-                </span>
-              </div>
-              <h1
-                className="text-2xl md:text-3xl font-bold text-white mb-2 leading-tight"
-                style={{ fontFamily: "Georgia, serif" }}
-              >
-                Hello, {user?.name?.split(" ")[0]} 👋
-              </h1>
-              <p className="text-gray-400 text-sm max-w-md leading-relaxed">
-                {books.length === 0
-                  ? "You haven't created any books yet. Start with your first travel photo book today."
-                  : books.filter((b) => b.status === "draft").length > 0
-                  ? `You have ${books.filter((b) => b.status === "draft").length} book${books.filter((b) => b.status === "draft").length > 1 ? "s" : ""} in progress. Continue where you left off.`
-                  : "Your books are ready. Create a new one or order a printed copy."
-                }
-              </p>
-            </div>
-            <button
-              onClick={() => navigate("/create")}
-              className="flex items-center gap-2.5 bg-rose-500 text-white px-7 py-3.5 rounded-full font-bold text-sm hover:bg-rose-400 transition shadow-lg flex-shrink-0 group"
-            >
-              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform duration-200" />
-              Create New Book
-            </button>
-          </div>
-        </div>
-
-        {/* ─── STATS ──────────────────────────────────────── */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
-            <StatCard key={stat.label} {...stat} />
-          ))}
-        </div>
-
-        {/* ─── BOOKS SECTION ──────────────────────────────── */}
-        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden">
-
-          {/* Section header */}
-          <div className="px-6 py-5 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h2
-                className="font-bold text-gray-900 text-lg"
-                style={{ fontFamily: "Georgia, serif" }}
-              >
-                My Books
-              </h2>
-              <p className="text-gray-400 text-xs mt-0.5">
-                {books.length} book{books.length !== 1 ? "s" : ""} total
-              </p>
-            </div>
-
-            {/* Filter tabs */}
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-              {filters.map((filter) => {
-                const count = filter.id === "all"
-                  ? books.length
-                  : books.filter((b) => b.status === filter.id).length;
-
-                return (
-                  <button
-                    key={filter.id}
-                    onClick={() => setActiveFilter(filter.id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition whitespace-nowrap
-                      ${activeFilter === filter.id
-                        ? "bg-gray-900 text-white"
-                        : "bg-gray-50 text-gray-500 hover:bg-gray-100"
-                      }`}
-                  >
-                    {filter.label}
-                    {count > 0 && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold
-                        ${activeFilter === filter.id
-                          ? "bg-white/20 text-white"
-                          : "bg-gray-200 text-gray-500"
-                        }`}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ── Loading ── */}
-          {loading && (
-            <div className="text-center py-20">
-              <div className="w-8 h-8 border-4 border-rose-200 border-t-rose-500 rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-gray-400 text-sm">Loading your books...</p>
-            </div>
-          )}
-
-          {/* ── Empty State ── */}
-          {!loading && filteredBooks.length === 0 && (
-            <div className="text-center py-20 px-8">
-              <div className="w-16 h-16 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto mb-5">
-                <BookOpen className="w-8 h-8 text-rose-300" />
-              </div>
-              <h3
-                className="text-lg font-bold text-gray-800 mb-2"
-                style={{ fontFamily: "Georgia, serif" }}
-              >
-                {activeFilter === "all" ? "No books yet" : `No ${activeFilter === "draft" ? "in-progress" : activeFilter} books`}
-              </h3>
-              <p className="text-gray-400 text-sm mb-7 max-w-xs mx-auto leading-relaxed">
-                {activeFilter === "all"
-                  ? "Create your first travel photo book and turn your memories into something beautiful."
-                  : "Nothing here yet. Books will appear here when their status changes."
-                }
-              </p>
-              {activeFilter === "all" && (
-                <button
-                  onClick={() => navigate("/create")}
-                  className="inline-flex items-center gap-2 bg-gray-900 text-white px-7 py-3 rounded-full font-semibold text-sm hover:bg-rose-500 transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Your First Book
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* ── Books Grid ── */}
-          {!loading && filteredBooks.length > 0 && (
-            <div className="p-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-
-                {/* New book card */}
-                {activeFilter === "all" && (
-                  <button
-                    onClick={() => navigate("/create")}
-                    className="rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center p-8 cursor-pointer hover:border-rose-300 hover:bg-rose-50/50 transition group min-h-64 text-center"
-                  >
-                    <div className="w-12 h-12 bg-gray-100 group-hover:bg-rose-100 rounded-2xl flex items-center justify-center mb-3 transition">
-                      <Plus className="w-6 h-6 text-gray-400 group-hover:text-rose-500 transition" />
-                    </div>
-                    <p className="font-semibold text-gray-400 group-hover:text-rose-500 text-sm transition mb-1">
-                      New Book
-                    </p>
-                    <p className="text-gray-300 text-xs">
-                      Start a new project
-                    </p>
-                  </button>
-                )}
-
-                {filteredBooks.map((book) => (
-                  <div
-                    key={book.id}
-                    className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg hover:border-gray-200 transition-all duration-200 group flex flex-col"
-                  >
-                    {/* Cover image */}
-                    <div className="relative h-48 bg-gradient-to-br from-rose-100 to-pink-100 overflow-hidden flex-shrink-0">
-                      {book.cover_image_url ? (
-                        <img
-                          src={book.cover_image_url}
-                          alt={book.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                          <BookOpen className="w-10 h-10 text-rose-200" />
-                          <p className="text-rose-300 text-xs font-medium">No cover yet</p>
-                        </div>
-                      )}
-
-                      {/* Dark overlay */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition duration-200" />
-
-                      {/* Status badge */}
-                      <div className="absolute top-3 left-3">
-                        <StatusBadge status={book.status} />
-                      </div>
-
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => handleDelete(book.id, e)}
-                        disabled={deletingId === book.id}
-                        className="absolute top-3 right-3 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 transition hover:bg-red-50"
-                        title="Delete book"
-                      >
-                        {deletingId === book.id
-                          ? <span className="w-3 h-3 border-2 border-red-300 border-t-transparent rounded-full animate-spin" />
-                          : <Trash2 className="w-3 h-3 text-red-400" />
-                        }
-                      </button>
-                    </div>
-
-                    {/* Book info */}
-                    <div className="p-4 flex flex-col flex-1">
-                      <h3
-                        className="font-bold text-gray-900 truncate mb-0.5 text-sm"
-                        style={{ fontFamily: "Georgia, serif" }}
-                      >
-                        {book.title}
-                      </h3>
-                      <p className="text-gray-400 text-xs truncate mb-1">
-                        {book.destination || "No destination"}
-                      </p>
-                      {book.travel_date_start && (
-                        <p className="text-gray-300 text-xs mb-3">
-                          {new Date(book.travel_date_start).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
-                      )}
-
-                      {/* Spacer */}
-                      <div className="flex-1" />
-
-                      {/* Last edited */}
-                      <p className="text-gray-300 text-xs mb-3 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {new Date(book.updated_at).toLocaleDateString("en-US", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </p>
-
-                      {/* Actions */}
-                      <div className="space-y-2">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => navigate(`/editor/${book.id}`)}
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-gray-900 text-white py-2 rounded-xl text-xs font-semibold hover:bg-rose-500 transition"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            {book.status === "draft" ? "Continue" : "Edit"}
-                          </button>
-                          <button
-                            onClick={() => navigate(`/preview/${book.id}`)}
-                            className="flex-1 flex items-center justify-center gap-1.5 bg-gray-50 text-gray-600 py-2 rounded-xl text-xs font-semibold hover:bg-gray-100 transition border border-gray-100"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            Preview
-                          </button>
-                        </div>
-
-                        {book.status === "complete" && (
-                          <button
-                            onClick={() => navigate(`/order/${book.id}`)}
-                            className="w-full flex items-center justify-center gap-1.5 bg-rose-500 text-white py-2 rounded-xl text-xs font-semibold hover:bg-rose-600 transition"
-                          >
-                            <ShoppingBag className="w-3.5 h-3.5" />
-                            Order Printed Book
-                          </button>
-                        )}
-
-                        {book.status === "ordered" && (
-                          <button
-                            onClick={() => navigate("/orders")}
-                            className="w-full flex items-center justify-center gap-1.5 bg-blue-50 text-blue-600 py-2 rounded-xl text-xs font-semibold hover:bg-blue-100 transition border border-blue-100"
-                          >
-                            <Package className="w-3.5 h-3.5" />
-                            Track Order
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ─── RECENT ORDERS ──────────────────────────────── */}
-        {orders.length > 0 && (
-          <div className="mt-6 bg-white rounded-3xl border border-gray-100 overflow-hidden">
-            <div className="px-6 py-5 border-b border-gray-50 flex justify-between items-center">
-              <div>
-                <h2
-                  className="font-bold text-gray-900 text-lg"
-                  style={{ fontFamily: "Georgia, serif" }}
-                >
-                  Recent Orders
-                </h2>
-                <p className="text-gray-400 text-xs mt-0.5">
-                  Your printed book orders
-                </p>
-              </div>
-              <Link
-                to="/orders"
-                className="text-rose-500 text-xs font-semibold hover:underline flex items-center gap-1"
-              >
-                View all <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-
-            <div className="divide-y divide-gray-50">
-              {orders.slice(0, 3).map((order) => {
-                const statusConfig = {
-                  pending: { label: "Processing", class: "bg-yellow-50 text-yellow-600 border border-yellow-100" },
-                  paid: { label: "Printing", class: "bg-blue-50 text-blue-600 border border-blue-100" },
-                  shipped: { label: "Shipped", class: "bg-purple-50 text-purple-600 border border-purple-100" },
-                  delivered: { label: "Delivered", class: "bg-green-50 text-green-600 border border-green-100" },
-                };
-                const s = statusConfig[order.status] || statusConfig.pending;
-
-                return (
-                  <div key={order.id} className="px-6 py-4 flex items-center gap-4 hover:bg-gray-50 transition">
-                    {/* Book cover */}
-                    <div className="w-12 h-10 rounded-lg overflow-hidden bg-rose-50 flex-shrink-0">
-                      {order.cover_image_url ? (
-                        <img src={order.cover_image_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <BookOpen className="w-4 h-4 text-rose-200" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-800 text-sm truncate">
-                        {order.title}
-                      </p>
-                      <p className="text-gray-400 text-xs">
-                        Order #{order.id} · {new Date(order.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
-                      </p>
-                    </div>
-
-                    {/* Status + price */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full hidden sm:inline-flex ${s.class}`}>
-                        {s.label}
-                      </span>
-                      <p className="font-bold text-gray-800 text-sm">
-                        ${order.total_price}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+        {/* ─── QUICK STATS ─────────────────────────────────── */}
+        {!loading && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
+            <StatCard 
+              icon={<Images className="w-5 h-5" />} 
+              value={books.length} 
+              label="Total Books" 
+            />
+            <StatCard 
+              icon={<Clock className="w-5 h-5" />} 
+              value={books.filter(b => b.status === "draft").length} 
+              label="In Progress" 
+            />
+            <StatCard 
+              icon={<CheckCircle className="w-5 h-5" />} 
+              value={books.filter(b => b.status === "complete").length} 
+              label="Ready to Print" 
+            />
+            <StatCard 
+              icon={<Package className="w-5 h-5" />} 
+              value={orders.length} 
+              label="Total Orders" 
+            />
           </div>
         )}
 
-        {/* ─── QUICK ACTIONS ──────────────────────────────── */}
-        <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <button
-            onClick={() => navigate("/create")}
-            className="bg-rose-500 text-white rounded-2xl p-5 text-left hover:bg-rose-600 transition group"
-          >
-            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
-              <Plus className="w-5 h-5 text-white" />
+        {/* ─── WORKSPACE DIVIDER ──────────────────────────── */}
+        <div className="flex flex-col lg:flex-row gap-10">
+          
+          {/* LEFT: MY BOOKS (Takes up 2/3 width on large screens) */}
+          <section className="flex-1 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <h2 className="text-xl font-bold text-gray-900 font-display">My Workspace</h2>
+              
+              {/* Filter Pills */}
+              <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
+                {filters.map((filter) => (
+                  <button
+                    key={filter.id}
+                    onClick={() => setActiveFilter(filter.id)}
+                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors
+                      ${activeFilter === filter.id
+                        ? "bg-gray-200 text-gray-900"
+                        : "bg-transparent text-gray-500 hover:bg-gray-100"
+                      }`}
+                  >
+                    {filter.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="font-bold text-white mb-0.5">Create New Book</p>
-            <p className="text-rose-200 text-xs">Start a new photo book project</p>
-          </button>
 
-          <button
-            onClick={() => navigate("/orders")}
-            className="bg-white border border-gray-100 text-left rounded-2xl p-5 hover:shadow-md hover:border-gray-200 transition group"
-          >
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-3">
-              <Package className="w-5 h-5 text-blue-500" />
-            </div>
-            <p className="font-bold text-gray-800 mb-0.5">Track Orders</p>
-            <p className="text-gray-400 text-xs">View and track your printed books</p>
-          </button>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-200 rounded-3xl">
+                <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mb-4" />
+                <p className="text-gray-500 text-sm font-medium">Loading your workspace...</p>
+              </div>
+            ) : filteredBooks.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 px-6 border-2 border-dashed border-gray-200 rounded-3xl bg-white text-center">
+                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+                  <BookOpen className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2 font-display">No books found</h3>
+                <p className="text-gray-500 text-sm max-w-sm mb-6">
+                  {activeFilter === "all" 
+                    ? "Your workspace is empty. Start your first project to bring your memories to life." 
+                    : `You don't have any books marked as '${activeFilter}'.`}
+                </p>
+                {activeFilter === "all" && (
+                  <button
+                    onClick={() => navigate("/create")}
+                    className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-rose-500 transition-colors"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Start a New Book
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                
+                {/* Always show a "New Book" card in the "All" view */}
+                {activeFilter === "all" && (
+                  <button
+                    onClick={() => navigate("/create")}
+                    className="group flex flex-col items-center justify-center h-full min-h-[340px] rounded-2xl border-2 border-dashed border-gray-200 bg-transparent hover:border-gray-400 hover:bg-gray-50 transition-all cursor-pointer"
+                  >
+                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform">
+                      <Plus className="w-5 h-5 text-gray-900" />
+                    </div>
+                    <span className="text-sm font-bold text-gray-900">Create New Book</span>
+                    <span className="text-xs text-gray-500 mt-1">Start a fresh canvas</span>
+                  </button>
+                )}
 
-          <button
-            onClick={() => {
-              const completedBook = books.find((b) => b.status === "complete");
-              if (completedBook) navigate(`/preview/${completedBook.id}`);
-              else navigate("/create");
-            }}
-            className="bg-white border border-gray-100 text-left rounded-2xl p-5 hover:shadow-md hover:border-gray-200 transition group"
-          >
-            <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center mb-3">
-              <Download className="w-5 h-5 text-green-500" />
+                {/* Book Cards */}
+                {filteredBooks.map((book) => (
+                  <div key={book.id} className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
+                    
+                    {/* Cover Area */}
+                    <div className="relative aspect-[3/4] w-full bg-gray-100 rounded-t-2xl overflow-hidden p-4 flex items-center justify-center">
+                      {book.cover_image_url ? (
+                        <div className="relative w-full h-full rounded-md overflow-hidden shadow-md group-hover:scale-[1.02] transition-transform duration-500">
+                           {/* Book Spine Shadow Effect */}
+                           <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/20 to-transparent z-10" />
+                           <img
+                            src={book.cover_image_url}
+                            alt={book.title}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-full h-full border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center bg-white/50">
+                          <Images className="w-8 h-8 text-gray-300 mb-2" />
+                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">No Cover</span>
+                        </div>
+                      )}
+
+                      {/* Floating Actions Overlay */}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[2px]">
+                        <button
+                          onClick={() => navigate(`/preview/${book.id}`)}
+                          className="w-10 h-10 bg-white text-gray-900 rounded-full flex items-center justify-center hover:bg-gray-100 transition-transform hover:scale-110 shadow-lg"
+                          title="Preview Book"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(book.id, e)}
+                          disabled={deletingId === book.id}
+                          className="w-10 h-10 bg-white text-red-600 rounded-full flex items-center justify-center hover:bg-red-50 transition-transform hover:scale-110 shadow-lg disabled:opacity-50"
+                          title="Delete Book"
+                        >
+                          {deletingId === book.id ? (
+                            <span className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" />
+                          ) : (
+                            <Trash2 className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Book Metadata */}
+                    <div className="p-5 flex flex-col flex-1">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-bold text-gray-900 text-base truncate pr-2 font-display">
+                          {book.title || "Untitled Book"}
+                        </h3>
+                        <StatusBadge status={book.status} />
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        <span className="truncate">{book.destination || "Destination unknown"}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>Edited {new Date(book.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                      </div>
+
+                      <div className="mt-auto pt-4 border-t border-gray-50">
+                        {book.status === "complete" ? (
+                          <button
+                            onClick={() => navigate(`/order/${book.id}`)}
+                            className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-rose-500 transition-colors"
+                          >
+                            <ShoppingBag className="w-4 h-4" />
+                            Order Print
+                          </button>
+                        ) : book.status === "ordered" ? (
+                          <button
+                            onClick={() => navigate("/orders")}
+                            className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-600 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors border border-gray-100"
+                          >
+                            <Package className="w-4 h-4" />
+                            Track Order
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => navigate(parseInt(book.photo_count) === 0 ? `/upload/${book.id}` : `/editor/${book.id}`)}
+                            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl text-xs font-bold hover:border-gray-900 hover:text-gray-900 transition-colors"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                            {parseInt(book.photo_count) === 0 ? "Add Photos" : "Continue Editing"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* RIGHT: RECENT ORDERS (Takes up 1/3 width on large screens) */}
+          <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 flex flex-col gap-6">
+            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm sticky top-24">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-bold text-gray-900 font-display">Recent Orders</h2>
+                <Link to="/orders" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+                  View All
+                </Link>
+              </div>
+
+              {!loading && orders.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Package className="w-5 h-5 text-gray-300" />
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">No orders yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Your printed books will appear here.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4">
+                  {orders.slice(0, 4).map((order) => {
+                    // Status config for sidebar
+                    const statusConfig = {
+                      pending: { label: "Processing", dot: "bg-yellow-400" },
+                      paid: { label: "Printing", dot: "bg-blue-400" },
+                      shipped: { label: "Shipped", dot: "bg-purple-400" },
+                      delivered: { label: "Delivered", dot: "bg-green-400" },
+                    };
+                    const s = statusConfig[order.status] || statusConfig.pending;
+
+                    return (
+                      <div key={order.id} className="group flex gap-3 p-3 -mx-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate('/orders')}>
+                        {/* Mini Cover */}
+                        <div className="w-12 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0 border border-gray-200/50">
+                          {order.cover_image_url ? (
+                            <img src={order.cover_image_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <BookOpen className="w-4 h-4 text-gray-300" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Details */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                          <p className="text-sm font-bold text-gray-900 truncate mb-0.5">{order.title}</p>
+                          <p className="text-xs text-gray-500 mb-1.5">Order #{String(order.id).padStart(5, '0')}</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                            <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">{s.label}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Arrow */}
+                        <div className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pr-2">
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-            <p className="font-bold text-gray-800 mb-0.5">Download PDF</p>
-            <p className="text-gray-400 text-xs">Export your book as a PDF file</p>
-          </button>
+          </aside>
+
         </div>
+      </main>
 
-        {/* ─── FOOTER ─────────────────────────────────────── */}
-        <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-3 pb-8">
-          <p className="text-gray-300 text-xs">
-            © 2026 Blushbook Nepal
+      {/* ─── FOOTER ─────────────────────────────────────── */}
+      <footer className="border-t border-gray-200 bg-white mt-auto">
+        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="text-gray-400 text-xs font-medium">
+            © {new Date().getFullYear()} Blushbook Nepal. All rights reserved.
           </p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-gray-300 hover:text-red-400 text-xs transition"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              Sign Out
-            </button>
-          </div>
+          <button
+            onClick={logoutUser}
+            className="flex items-center gap-1.5 text-gray-400 hover:text-gray-900 text-xs font-semibold transition-colors"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign Out
+          </button>
         </div>
-      </div>
+      </footer>
 
-      {/* Click outside to close dropdown */}
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
     </div>
   );
 };

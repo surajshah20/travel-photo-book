@@ -1,98 +1,102 @@
 // client/src/pages/Register.jsx
-// Blushbook — Production Register Page
+// BlushBook — Register Page aligned to Landing Page design system
 
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { BookOpen, Eye, EyeOff, Mail, Lock, User, Check, X } from "lucide-react";
+import { Eye, EyeOff, Mail, Lock, User, Check, X, ArrowRight, Star } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../design-system/Logo";
+import { C, S, authPageStyles } from "../design-system/index";
+import PhotoBook from "../assets/hero.jpg"; 
 
-// ─── Password Rule Component ──────────────────────────────
-const PasswordRule = ({ met, text }) => (
-  <div className={`flex items-center gap-2 text-xs transition-colors ${met ? "text-green-600" : "text-gray-400"}`}>
-    <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-colors ${met ? "bg-green-100" : "bg-gray-100"}`}>
+// ─── Reused from Login ────────────────────────────────────
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+  </svg>
+);
+
+const Stars = ({ size = 13 }) => (
+  <div style={{ display: "flex", gap: 2 }}>
+    {[...Array(5)].map((_, i) => (
+      <Star key={i} size={size} fill="#FCD34D" color="#FCD34D" />
+    ))}
+  </div>
+);
+
+// ─── Password Rule ────────────────────────────────────────
+const PwRule = ({ met, text }) => (
+  <div className="pw-rule" style={{ color: met ? C.success : C.subtle }}>
+    <div
+      className="pw-rule-dot"
+      style={{ background: met ? "#DCFCE7" : "#F3F4F6" }}
+    >
       {met
-        ? <Check className="w-2.5 h-2.5" />
-        : <X className="w-2.5 h-2.5" />
+        ? <Check size={9} color={C.success} strokeWidth={3} />
+        : <X size={9} color={C.subtle} strokeWidth={2} />
       }
     </div>
     {text}
   </div>
 );
 
+// ── Strength color map ─────────────────────────────────────
+const strengthColor = ["#F87171", "#FB923C", "#FBBF24", "#4ADE80"];
+const strengthLabel = ["Weak", "Fair", "Good", "Strong"];
+
+// ══════════════════════════════════════════════════════════
 const Register = () => {
   const navigate = useNavigate();
   const { loginUser } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-    confirmPassword: "",
+    name: "", email: "", password: "", confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [pwFocused, setPwFocused] = useState(false);
 
-  // ─── Password rules ───────────────────────────────────
-  const passwordRules = [
+  const rules = [
     { met: formData.password.length >= 8, text: "Minimum 8 characters" },
     { met: /[A-Z]/.test(formData.password), text: "One uppercase letter" },
     { met: /[a-z]/.test(formData.password), text: "One lowercase letter" },
     { met: /[0-9]/.test(formData.password), text: "One number" },
   ];
-
-  const passwordStrength = passwordRules.filter((r) => r.met).length;
-  const strengthColors = ["bg-red-400", "bg-orange-400", "bg-yellow-400", "bg-green-400"];
-  const strengthLabels = ["Weak", "Fair", "Good", "Strong"];
+  const strength = rules.filter((r) => r.met).length;
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    if (errors[e.target.name]) {
-      setErrors({ ...errors, [e.target.name]: "" });
-    }
+    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+    if (errors[e.target.name]) setErrors((p) => ({ ...p, [e.target.name]: "" }));
+    if (serverError) setServerError("");
   };
 
-  // ─── Validation ───────────────────────────────────────
   const validate = () => {
-    const newErrors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!formData.name.trim() || formData.name.trim().length < 2) {
-      newErrors.name = "Please enter your full name";
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = "Email is required";
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (passwordStrength < 4) {
-      newErrors.password = "Please meet all password requirements";
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = "Please confirm your password";
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const errs = {};
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!formData.name.trim() || formData.name.trim().length < 2)
+      errs.name = "Please enter your full name";
+    if (!formData.email.trim()) errs.email = "Email is required";
+    else if (!re.test(formData.email)) errs.email = "Please enter a valid email";
+    if (!formData.password) errs.password = "Password is required";
+    else if (strength < 4) errs.password = "Please meet all password requirements";
+    if (!formData.confirmPassword) errs.confirmPassword = "Please confirm your password";
+    else if (formData.password !== formData.confirmPassword)
+      errs.confirmPassword = "Passwords do not match";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setServerError("");
-
     if (!validate()) return;
-
     setLoading(true);
     try {
       const res = await api.post("/auth/register", {
@@ -100,339 +104,409 @@ const Register = () => {
         email: formData.email.toLowerCase().trim(),
         password: formData.password,
       });
-
       loginUser(res.data.user, res.data.token);
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setServerError(
-        err.response?.data?.error || "Something went wrong. Please try again."
-      );
+      setServerError(err.response?.data?.error || "Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  const pwMatch = formData.confirmPassword && formData.password === formData.confirmPassword;
+
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-2">
+    <>
+      <style>{authPageStyles}</style>
 
-      {/* ─── Left — Form Panel ───────────────────────── */}
-      <div className="flex flex-col justify-center px-8 md:px-14 py-12 bg-white overflow-y-auto">
+      <div className="bb-page">
 
-        {/* Mobile logo */}
-        <div
-          className="flex items-center gap-2 mb-8 md:hidden cursor-pointer"
-          onClick={() => navigate("/")}
-        >
-          <div className="w-8 h-8 bg-rose-500 rounded-lg flex items-center justify-center">
-            <BookOpen className="w-4 h-4 text-white" />
+        {/* ── LEFT — Form panel ──────────────────────── */}
+        <div style={{
+          display: "flex", flexDirection: "column",
+          justifyContent: "center", alignItems: "center",
+          padding: "48px 40px",
+          background: C.bg, overflowY: "auto",
+        }}>
+          {/* Mobile logo */}
+          <div style={{ marginBottom: 32, width: "100%", maxWidth: 380 }}>
+            <Logo size={22} clickable />
           </div>
-          <span className="text-xl font-bold text-gray-900" style={{ fontFamily: "Georgia, serif" }}>
-            blush<span className="text-rose-500">book</span>
-          </span>
-        </div>
 
-        <div className="max-w-sm w-full mx-auto">
-          <h1
-            className="text-3xl font-bold text-gray-900 mb-1"
-            style={{ fontFamily: "Georgia, serif" }}
-          >
-            Create your account
-          </h1>
-          <p className="text-gray-400 mb-7 text-sm">
-            Free to start — pay only when you order a printed book
-          </p>
+          <div className="bb-fade-up" style={{ width: "100%", maxWidth: 380 }}>
 
-          {/* Server error */}
-          {serverError && (
-            <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl mb-5 text-sm flex items-start gap-2">
-              <span className="mt-0.5 flex-shrink-0">⚠️</span>
-              {serverError}
+            {/* Heading */}
+            <div style={{ marginBottom: 28 }}>
+              <h1 style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: 28, fontWeight: 800,
+                color: C.ink, margin: "0 0 6px",
+                letterSpacing: "-0.03em", lineHeight: 1.1,
+              }}>
+                Create your account
+              </h1>
+              <p style={{ fontSize: 14, color: C.muted, margin: 0, fontWeight: 400 }}>
+                Free to start — pay only when you order a printed book
+              </p>
             </div>
-          )}
 
-          {/* Google OAuth */}
-          <button
-            type="button"
-            className="w-full flex items-center justify-center gap-3 border border-gray-200 py-3 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition mb-5 shadow-sm"
-            onClick={() => alert("Google OAuth coming soon!")}
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-            </svg>
-            Continue with Google
-          </button>
+            {/* Server error */}
+            {serverError && (
+              <div className="bb-server-error bb-fade-up">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0, marginTop: 1 }}>
+                  <circle cx="7" cy="7" r="6.5" stroke="#DC2626" />
+                  <path d="M7 4v3.5M7 9v.5" stroke="#DC2626" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+                {serverError}
+              </div>
+            )}
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-5">
-            <div className="flex-1 h-px bg-gray-100" />
-            <span className="text-gray-300 text-xs font-medium">or create with email</span>
-            <div className="flex-1 h-px bg-gray-100" />
-          </div>
+            {/* Google */}
+            <div className="bb-fade-up bb-fade-up-1" style={{ marginBottom: 20 }}>
+              <button
+                className="bb-btn-google"
+                onClick={() => window.location.href = "http://localhost:5000/api/auth/google"}
+              >
+                <GoogleIcon />
+                <span>Continue with Google</span>
+              </button>
+            </div>
 
-          {/* Form fields */}
-          <div className="space-y-4">
+            {/* Divider */}
+            <div className="bb-divider bb-fade-up bb-fade-up-1">
+              <span>or create with email</span>
+            </div>
 
-            {/* Full Name */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Full Name
-              </label>
-              <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+            {/* Name */}
+            <div className="bb-fade-up bb-fade-up-2">
+              <label className="bb-label">Full Name</label>
+              <div style={{ position: "relative", marginBottom: errors.name ? 0 : 18 }}>
+                <User
+                  size={15} color={errors.name ? C.error : C.subtle}
+                  style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                />
                 <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
+                  type="text" name="name"
+                  value={formData.name} onChange={handleChange}
                   placeholder="Your full name"
-                  className={`w-full border rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 transition
-                    ${errors.name ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                  className={`bb-input ${errors.name ? "error" : ""}`}
+                  autoComplete="name"
                 />
               </div>
               {errors.name && (
-                <p className="text-red-500 text-xs mt-1.5">⚠ {errors.name}</p>
+                <p className="bb-field-error" style={{ marginBottom: 18 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5.5" stroke="#DC2626" />
+                    <path d="M6 3.5v3M6 8v.5" stroke="#DC2626" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  {errors.name}
+                </p>
               )}
             </div>
 
             {/* Email */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+            <div className="bb-fade-up bb-fade-up-2">
+              <label className="bb-label">Email address</label>
+              <div style={{ position: "relative", marginBottom: errors.email ? 0 : 18 }}>
+                <Mail
+                  size={15} color={errors.email ? C.error : C.subtle}
+                  style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                />
                 <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
+                  type="email" name="email"
+                  value={formData.email} onChange={handleChange}
                   placeholder="you@example.com"
-                  className={`w-full border rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 transition
-                    ${errors.email ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                  className={`bb-input ${errors.email ? "error" : ""}`}
+                  autoComplete="email"
                 />
               </div>
               {errors.email && (
-                <p className="text-red-500 text-xs mt-1.5">⚠ {errors.email}</p>
+                <p className="bb-field-error" style={{ marginBottom: 18 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5.5" stroke="#DC2626" />
+                    <path d="M6 3.5v3M6 8v.5" stroke="#DC2626" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  {errors.email}
+                </p>
               )}
             </div>
 
             {/* Password */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
+            <div className="bb-fade-up bb-fade-up-3">
+              <label className="bb-label">Password</label>
+              <div style={{ position: "relative" }}>
+                <Lock
+                  size={15} color={errors.password ? C.error : C.subtle}
+                  style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+                />
                 <input
-                  type={showPassword ? "text" : "password"}
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  onFocus={() => setPasswordFocused(true)}
-                  onBlur={() => setPasswordFocused(false)}
+                  type={showPw ? "text" : "password"} name="password"
+                  value={formData.password} onChange={handleChange}
+                  onFocus={() => setPwFocused(true)}
+                  onBlur={() => setPwFocused(false)}
                   placeholder="Create a strong password"
-                  className={`w-full border rounded-xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 transition
-                    ${errors.password ? "border-red-300 bg-red-50" : "border-gray-200"}`}
+                  className={`bb-input ${errors.password ? "error" : ""}`}
+                  style={{ paddingRight: 44 }}
+                  autoComplete="new-password"
                 />
                 <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition"
+                  type="button" onClick={() => setShowPw(!showPw)}
+                  style={{
+                    position: "absolute", right: 14, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer",
+                    color: C.subtle, display: "flex", alignItems: "center",
+                  }}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
 
-              {/* Password strength bar */}
+              {/* Strength bar */}
               {formData.password && (
-                <div className="mt-2">
-                  <div className="flex gap-1 mb-1">
+                <div style={{ marginTop: 8, marginBottom: 4 }}>
+                  <div className="strength-bar">
                     {[...Array(4)].map((_, i) => (
                       <div
                         key={i}
-                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
-                          i < passwordStrength
-                            ? strengthColors[passwordStrength - 1]
-                            : "bg-gray-100"
-                        }`}
+                        className="strength-segment"
+                        style={{ background: i < strength ? strengthColor[strength - 1] : C.line }}
                       />
                     ))}
                   </div>
-                  <p className={`text-xs ${passwordStrength >= 3 ? "text-green-600" : "text-gray-400"}`}>
-                    Password strength: {strengthLabels[passwordStrength - 1] || "Too weak"}
+                  <p style={{
+                    fontSize: 11.5, marginTop: 5,
+                    color: strength >= 3 ? C.success : C.muted,
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    fontWeight: 500,
+                  }}>
+                    {strength > 0 ? `Password strength: ${strengthLabel[strength - 1]}` : ""}
                   </p>
                 </div>
               )}
 
-              {/* Password rules */}
-              {(passwordFocused || formData.password) && (
-                <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-1.5">
-                  {passwordRules.map((rule) => (
-                    <PasswordRule key={rule.text} met={rule.met} text={rule.text} />
-                  ))}
+              {/* Rules */}
+              {(pwFocused || formData.password) && (
+                <div style={{
+                  background: C.bgSoft, borderRadius: 12,
+                  padding: "12px 14px", marginTop: 8,
+                  display: "flex", flexDirection: "column", gap: 7,
+                  border: `1px solid ${C.line}`,
+                }}>
+                  {rules.map((r) => <PwRule key={r.text} met={r.met} text={r.text} />)}
                 </div>
               )}
 
               {errors.password && (
-                <p className="text-red-500 text-xs mt-1.5">⚠ {errors.password}</p>
+                <p className="bb-field-error" style={{ marginTop: 6, marginBottom: 0 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5.5" stroke="#DC2626" />
+                    <path d="M6 3.5v3M6 8v.5" stroke="#DC2626" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  {errors.password}
+                </p>
               )}
+              <div style={{ marginBottom: 18 }} />
             </div>
 
             {/* Confirm Password */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Confirm Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" />
-                <input
-                  type={showConfirm ? "text" : "password"}
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  placeholder="Repeat your password"
-                  className={`w-full border rounded-xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-rose-300 transition
-                    ${errors.confirmPassword
-                      ? "border-red-300 bg-red-50"
-                      : formData.confirmPassword && formData.password === formData.confirmPassword
-                      ? "border-green-300 bg-green-50"
-                      : "border-gray-200"
-                    }`}
+            <div className="bb-fade-up bb-fade-up-3">
+              <label className="bb-label">Confirm Password</label>
+              <div style={{ position: "relative", marginBottom: errors.confirmPassword ? 0 : 22 }}>
+                <Lock
+                  size={15}
+                  color={errors.confirmPassword ? C.error : pwMatch ? C.success : C.subtle}
+                  style={{ position: "absolute", left: 15, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirm(!showConfirm)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition"
-                >
-                  {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-                {/* Match indicator */}
-                {formData.confirmPassword && formData.password === formData.confirmPassword && (
-                  <div className="absolute right-10 top-1/2 -translate-y-1/2">
-                    <Check className="w-4 h-4 text-green-500" />
+                <input
+                  type={showConfirm ? "text" : "password"} name="confirmPassword"
+                  value={formData.confirmPassword} onChange={handleChange}
+                  placeholder="Repeat your password"
+                  className={`bb-input ${errors.confirmPassword ? "error" : pwMatch ? "success" : ""}`}
+                  style={{ paddingRight: 72 }}
+                  autoComplete="new-password"
+                />
+                {/* Match checkmark */}
+                {pwMatch && (
+                  <div style={{
+                    position: "absolute", right: 40, top: "50%",
+                    transform: "translateY(-50%)",
+                    display: "flex", alignItems: "center",
+                  }}>
+                    <Check size={15} color={C.success} />
                   </div>
                 )}
+                <button
+                  type="button" onClick={() => setShowConfirm(!showConfirm)}
+                  style={{
+                    position: "absolute", right: 14, top: "50%",
+                    transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer",
+                    color: C.subtle, display: "flex", alignItems: "center",
+                  }}
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
               {errors.confirmPassword && (
-                <p className="text-red-500 text-xs mt-1.5">⚠ {errors.confirmPassword}</p>
+                <p className="bb-field-error" style={{ marginBottom: 22 }}>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5.5" stroke="#DC2626" />
+                    <path d="M6 3.5v3M6 8v.5" stroke="#DC2626" strokeWidth="1.2" strokeLinecap="round" />
+                  </svg>
+                  {errors.confirmPassword}
+                </p>
               )}
             </div>
 
             {/* Submit */}
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="w-full bg-gray-900 text-white py-3.5 rounded-xl font-bold text-sm hover:bg-rose-500 transition disabled:opacity-50 disabled:cursor-not-allowed mt-1"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creating account...
-                </span>
-              ) : (
-                "Create Free Account"
-              )}
-            </button>
-
-            <p className="text-center text-gray-300 text-xs leading-relaxed">
-              By creating an account you agree to our{" "}
-              <span className="text-rose-400 cursor-pointer hover:underline">Terms of Service</span>{" "}
-              and{" "}
-              <span className="text-rose-400 cursor-pointer hover:underline">Privacy Policy</span>
-            </p>
-          </div>
-
-          {/* Login link */}
-          <p className="text-center text-gray-400 text-sm mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="text-rose-500 font-bold hover:underline">
-              Sign in
-            </Link>
-          </p>
-
-          <p className="text-center mt-3">
-            <span
-              onClick={() => navigate("/")}
-              className="text-gray-300 text-xs hover:text-gray-500 cursor-pointer transition"
-            >
-              Back to homepage
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* ─── Right — Image Panel ─────────────────────── */}
-      <div className="hidden md:block relative overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1512758017271-d7b84c2113f1?w=900&q=90"
-          alt="Photo book"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-bl from-gray-900/70 to-rose-900/50" />
-
-        <div className="absolute inset-0 flex flex-col justify-between p-10">
-          {/* Logo */}
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => navigate("/")}
-          >
-            <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-rose-500" />
-            </div>
-            <span className="text-white text-xl font-bold" style={{ fontFamily: "Georgia, serif" }}>
-              blush<span className="text-rose-300">book</span>
-            </span>
-          </div>
-
-          {/* Benefits */}
-          <div>
-            <h2
-              className="text-3xl font-bold text-white mb-6 leading-tight"
-              style={{ fontFamily: "Georgia, serif" }}
-            >
-              Start creating your photo book today
-            </h2>
-            <div className="space-y-3.5 mb-8">
-              {[
-                "Free to design — no credit card needed",
-                "AI automatically organizes your photos",
-                "50+ professional templates",
-                "Download as PDF or order printed copy",
-                "eSewa & Khalti payment supported",
-              ].map((benefit) => (
-                <div key={benefit} className="flex items-center gap-3">
-                  <div className="w-5 h-5 bg-rose-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Check className="w-3 h-3 text-white" />
-                  </div>
-                  <span className="text-white/80 text-sm">{benefit}</span>
-                </div>
-              ))}
+            <div className="bb-fade-up bb-fade-up-4" style={{ marginBottom: 14 }}>
+              <button
+                type="button" className="bb-btn-primary"
+                onClick={handleSubmit} disabled={loading}
+                style={{ borderRadius: 14, padding: "15px" }}
+              >
+                {loading ? (
+                  <>
+                    <span style={{
+                      width: 16, height: 16,
+                      border: "2px solid rgba(255,255,255,0.3)",
+                      borderTopColor: "#fff", borderRadius: "50%",
+                      animation: "spin 0.7s linear infinite",
+                      display: "inline-block",
+                    }} />
+                    Creating account...
+                  </>
+                ) : (
+                  <>Create Free Account <ArrowRight size={15} /></>
+                )}
+              </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: "500+", label: "Books Created" },
-                { value: "4.9★", label: "Rating" },
-                { value: "Nepal", label: "Based" },
-              ].map((stat) => (
-                <div
-                  key={stat.label}
-                  className="bg-white/10 backdrop-blur-sm rounded-xl p-3 text-center border border-white/20"
+            {/* Terms */}
+            <div className="bb-fade-up bb-fade-up-4" style={{ textAlign: "center", marginBottom: 20 }}>
+              <p style={{ fontSize: 11.5, color: C.subtle, lineHeight: 1.6, margin: 0 }}>
+                By creating an account you agree to our{" "}
+                <span style={{ color: C.rose, cursor: "pointer", fontWeight: 600 }}>Terms</span>{" "}
+                and{" "}
+                <span style={{ color: C.rose, cursor: "pointer", fontWeight: 600 }}>Privacy Policy</span>
+              </p>
+            </div>
+
+            {/* Footer links */}
+            <div className="bb-fade-up bb-fade-up-5" style={{ textAlign: "center" }}>
+              <p style={{ fontSize: 13.5, color: C.muted, margin: "0 0 10px" }}>
+                Already have an account?{" "}
+                <Link
+                  to="/login"
+                  style={{ color: C.rose, fontWeight: 700, textDecoration: "none" }}
+                  onMouseEnter={e => e.target.style.textDecoration = "underline"}
+                  onMouseLeave={e => e.target.style.textDecoration = "none"}
                 >
-                  <p className="text-white font-bold">{stat.value}</p>
-                  <p className="text-white/50 text-xs mt-0.5">{stat.label}</p>
-                </div>
-              ))}
+                  Sign in
+                </Link>
+              </p>
+              <button
+                className="bb-btn-ghost"
+                onClick={() => navigate("/")}
+                style={{ fontSize: 12, color: C.subtle }}
+              >
+                ← Back to homepage
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── RIGHT — Image panel ────────────────────── */}
+        <div
+          className="bb-panel-image"
+          style={{ position: "relative", overflow: "hidden", background: "#0A0A0A" }}
+        >
+          <img
+            src={PhotoBook}
+            alt="BlushBook photo book"
+            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.5 }}
+          />
+          <div style={{
+            position: "absolute", inset: 0,
+            background: "linear-gradient(225deg, rgba(15,15,15,0.75) 0%, rgba(200,52,90,0.35) 100%)",
+          }} />
+
+          <div style={{
+            position: "absolute", inset: 0,
+            padding: "44px 48px",
+            display: "flex", flexDirection: "column", justifyContent: "space-between",
+          }}>
+            <Logo size={22} dark clickable />
+
+            <div>
+              <h2 style={{
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                fontSize: "clamp(22px,2.5vw,30px)",
+                fontWeight: 800, color: "#fff",
+                lineHeight: 1.18, letterSpacing: "-0.03em",
+                marginBottom: 28,
+              }}>
+                Start creating your<br />
+                <em style={{ fontStyle: "italic", color: C.roseMid }}>photo book today</em>
+              </h2>
+
+              {/* Benefits */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+                {[
+                  "Free to design — no credit card needed",
+                  "AI automatically organises your photos",
+                  "50+ professional templates",
+                  "Download as PDF or order printed copy",
+                  "eSewa & Khalti payments supported",
+                ].map((b) => (
+                  <div key={b} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 20, height: 20,
+                      background: C.rose,
+                      borderRadius: "50%",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <Check size={11} color="#fff" strokeWidth={3} />
+                    </div>
+                    <span style={{ fontSize: 13.5, color: "rgba(255,255,255,0.78)", fontWeight: 400 }}>
+                      {b}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Stats */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+                {[
+                  { v: "500+", l: "Books" },
+                  { v: "4.9★", l: "Rating" },
+                  { v: "Nepal", l: "Based" },
+                ].map((s) => (
+                  <div key={s.l} style={{
+                    background: "rgba(255,255,255,0.07)",
+                    backdropFilter: "blur(8px)",
+                    borderRadius: 14, padding: "14px 12px",
+                    textAlign: "center",
+                    border: "1px solid rgba(255,255,255,0.10)",
+                  }}>
+                    <p style={{ fontWeight: 800, color: "#fff", fontSize: 16, margin: "0 0 2px", letterSpacing: "-0.02em" }}>
+                      {s.v}
+                    </p>
+                    <p style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", margin: 0 }}>
+                      {s.l}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </>
   );
 };
 

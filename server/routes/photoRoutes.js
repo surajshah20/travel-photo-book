@@ -9,7 +9,24 @@ const { uploadPhoto, getPhotos, removePhoto } = require("../controllers/photoCon
 // POST /api/photos/upload — upload a single photo
 // protect = must be logged in
 // upload.single("photo") = multer reads the file named "photo" from the request
-router.post("/upload", protect, upload.single("photo"), uploadPhoto);
+router.post(
+  "/upload",
+  (req,res,next)=>{
+    console.log("STEP 1");
+    next();
+  },
+  protect,
+  (req,res,next)=>{
+    console.log("STEP 2");
+    next();
+  },
+  upload.single("photo"),
+  (req,res,next)=>{
+    console.log("STEP 3");
+    next();
+  },
+  uploadPhoto
+);
 
 // GET /api/photos/:bookId — get all photos for a book
 router.get("/:bookId", protect, getPhotos);
