@@ -1,15 +1,14 @@
 // server/services/emailService.js
-// Production email service — swap SMTP for Resend/SES in production
+// Production email service
 
 const nodemailer = require("nodemailer");
 
+// ─── Nodemailer Configuration ─────────────────────────────
 const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: false,
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    pass: process.env.EMAIL_PASS, 
   },
 });
 
@@ -42,8 +41,8 @@ const baseTemplate = (content) => `
         <!-- Footer -->
         <tr><td style="padding:24px 0 0;text-align:center;">
           <p style="margin:0;font-size:12px;color:#9A9A9A;line-height:1.6;">
-            BlushBook Nepal · Kathmandu, Nepal<br>
-            Questions? <a href="mailto:support@blushbook.com.np" style="color:#C8345A;text-decoration:none;">support@blushbook.com.np</a>
+            BlushBook Nepal<br>
+            Questions about your order? Simply reply to this email and we'll get right back to you.
           </p>
         </td></tr>
 
@@ -56,7 +55,6 @@ const baseTemplate = (content) => `
 
 // ─── Order Confirmation Email ─────────────────────────────
 const sendOrderConfirmation = async (order, user, book) => {
-  const statusColor = "#16A34A";
   const html = baseTemplate(`
     <!-- Header -->
     <div style="background:linear-gradient(135deg,#C8345A,#E11D48);padding:32px;text-align:center;">
@@ -70,8 +68,8 @@ const sendOrderConfirmation = async (order, user, book) => {
     <div style="padding:32px;">
       <p style="margin:0 0 20px;font-size:15px;color:#3D3D3D;line-height:1.7;">
         Hi ${user.name?.split(" ")[0]},<br><br>
-        Thank you for your order. We've received your payment and your photo book is now in the print queue. 
-        We'll notify you when it ships.
+        Thank you for your order. We've received your request and your photo book is now entering our queue. 
+        We'll notify you via email as soon as it ships.
       </p>
 
       <!-- Order summary box -->
@@ -102,7 +100,7 @@ const sendOrderConfirmation = async (order, user, book) => {
             <td style="padding:6px 0;border-bottom:1px solid #EBEBEB;">
               <table width="100%"><tr>
                 <td style="font-size:13px;color:#6B6B6B;">Payment Method</td>
-                <td align="right" style="font-size:13px;font-weight:700;color:#0F0F0F;">${order.payment_method.toUpperCase()}</td>
+                <td align="right" style="font-size:13px;font-weight:700;color:#0F0F0F;">${order.payment_method === 'qr_transfer' ? 'MANUAL QR' : order.payment_method.toUpperCase()}</td>
               </tr></table>
             </td>
           </tr>
@@ -132,7 +130,7 @@ const sendOrderConfirmation = async (order, user, book) => {
       <!-- Timeline -->
       <div style="background:#FFF0F4;border-radius:14px;padding:20px;margin:0 0 24px;border:1px solid #F9D0DA;">
         <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#C8345A;">What happens next?</p>
-        ${["We print your book (1–2 business days)", "Quality check & packaging (1 day)", "Shipped via courier (3–7 business days)", "Delivered to your door!"].map((step, i) => `
+        ${["We verify & print your book (1–2 business days)", "Quality check & packaging (1 day)", "Shipped via courier (3–7 business days)", "Delivered to your door!"].map((step, i) => `
           <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:${i < 3 ? "10px" : "0"};">
             <div style="width:22px;height:22px;background:#C8345A;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
               <span style="color:#fff;font-size:11px;font-weight:800;">${i + 1}</span>
@@ -143,14 +141,14 @@ const sendOrderConfirmation = async (order, user, book) => {
       </div>
 
       <p style="margin:0;font-size:13px;color:#6B6B6B;line-height:1.7;">
-        You can track your order status anytime from your 
+        You can view your order details and check its current status from your 
         <a href="${process.env.CLIENT_URL}/orders" style="color:#C8345A;font-weight:600;text-decoration:none;">BlushBook dashboard</a>.
       </p>
     </div>
   `);
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+    from: `"BlushBook Orders" <${process.env.EMAIL_USER}>`,
     to: user.email,
     subject: `Order Confirmed #${String(order.id).padStart(5, "0")} — BlushBook Nepal`,
     html,
@@ -170,21 +168,21 @@ const sendShippingUpdate = async (order, user, trackingNumber) => {
         Great news — your BlushBook photo book has been shipped and is on its way to you!
       </p>
       <div style="background:#EFF6FF;border-radius:14px;padding:20px;margin:0 0 24px;border:1px solid #BFDBFE;">
-        <p style="margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#2563EB;">Tracking Information</p>
+        <p style="margin:0 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#2563EB;">Delivery Information</p>
         <p style="margin:0;font-size:18px;font-weight:800;color:#1D4ED8;letter-spacing:0.05em;">${trackingNumber}</p>
         <p style="margin:6px 0 0;font-size:12px;color:#6B6B6B;">
           Order #${String(order.id).padStart(5, "0")} · Estimated delivery: 3–7 business days
         </p>
       </div>
       <p style="margin:0;font-size:13px;color:#6B6B6B;line-height:1.7;">
-        Track your order from your 
+        You can view your order history and details from your 
         <a href="${process.env.CLIENT_URL}/orders" style="color:#C8345A;font-weight:600;text-decoration:none;">dashboard</a>.
       </p>
     </div>
   `);
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+    from: `"BlushBook Shipping" <${process.env.EMAIL_USER}>`,
     to: user.email,
     subject: `Your BlushBook is Shipped! 🚀 — Order #${String(order.id).padStart(5, "0")}`,
     html,
@@ -194,6 +192,10 @@ const sendShippingUpdate = async (order, user, trackingNumber) => {
 // ─── Admin New Order Alert ────────────────────────────────
 const sendAdminOrderAlert = async (order, user, book) => {
   if (!process.env.ADMIN_EMAIL) return;
+
+  const receiptLink = (order.payment_method === 'qr_transfer' && order.payment_proof_url)
+    ? `<a href="${order.payment_proof_url}" target="_blank" style="color:#C8345A;font-weight:700;text-decoration:none;">View Receipt Screenshot</a>`
+    : "—";
 
   const html = baseTemplate(`
     <div style="background:#0F0F0F;padding:24px;">
@@ -206,17 +208,17 @@ const sendAdminOrderAlert = async (order, user, book) => {
           ["Customer", `${user.name} (${user.email})`],
           ["Book", book.title],
           ["Amount", `Rs. ${order.amount_npr}`],
-          ["Payment", order.payment_method.toUpperCase()],
-          ["Payment ID", order.payment_id || "—"],
+          ["Payment", order.payment_method === 'qr_transfer' ? 'MANUAL QR' : order.payment_method.toUpperCase()],
+          ["Receipt", receiptLink],
           ["Ship to", `${order.shipping_city}, ${order.shipping_district}`],
         ].map(([label, value]) => `
           <tr>
-            <td style="padding:8px 0;font-size:13px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;width:140px;">${label}</td>
-            <td style="padding:8px 0;font-size:13px;font-weight:700;color:#0F0F0F;border-bottom:1px solid #EBEBEB;">${value}</td>
+            <td style="padding:10px 0;font-size:13px;color:#6B6B6B;border-bottom:1px solid #EBEBEB;width:120px;">${label}</td>
+            <td style="padding:10px 0;font-size:13px;font-weight:700;color:#0F0F0F;border-bottom:1px solid #EBEBEB;">${value}</td>
           </tr>
         `).join("")}
       </table>
-      <div style="margin-top:20px;">
+      <div style="margin-top:24px;">
         <a href="${process.env.CLIENT_URL}/admin" 
            style="display:inline-block;background:#C8345A;color:#fff;padding:12px 24px;border-radius:100px;font-size:13px;font-weight:700;text-decoration:none;">
           View in Admin Panel
@@ -226,7 +228,7 @@ const sendAdminOrderAlert = async (order, user, book) => {
   `);
 
   await transporter.sendMail({
-    from: process.env.EMAIL_FROM,
+    from: `"BlushBook System" <${process.env.EMAIL_USER}>`,
     to: process.env.ADMIN_EMAIL,
     subject: `New Order #${String(order.id).padStart(5, "0")} — Rs. ${order.amount_npr} — BlushBook`,
     html,

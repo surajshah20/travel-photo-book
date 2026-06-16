@@ -19,7 +19,7 @@ const PRICING = {
 
 // ─── Helper: Create Order Record ──────────────────────────
 const createOrderRecord = async ({
-  userId, bookId, bookType, paymentMethod, shippingData, paymentRef
+  userId, bookId, bookType, paymentMethod, shippingData, paymentRef, paymentProofUrl = null
 }) => {
   const amountNpr = (PRICING[bookType] || PRICING.default) + 150; // Add 150 shipping
   const amountPaisa = amountNpr * 100;
@@ -29,11 +29,11 @@ const createOrderRecord = async ({
       user_id, book_id, book_type, amount, amount_npr, currency,
       payment_method, payment_ref, payment_status, order_status,
       shipping_name, shipping_phone, shipping_address,
-      shipping_city, shipping_district, shipping_province, shipping_notes
+      shipping_city, shipping_district, shipping_province, shipping_notes, payment_proof_url
     ) VALUES (
       $1,$2,$3,$4,$5,'NPR',
       $6,$7,'pending','pending',
-      $8,$9,$10,$11,$12,$13,$14
+      $8,$9,$10,$11,$12,$13,$14,$15
     ) RETURNING *`,
     [
       userId, bookId, bookType, amountPaisa, amountNpr,
@@ -41,6 +41,7 @@ const createOrderRecord = async ({
       shippingData.name, shippingData.phone, shippingData.address,
       shippingData.city, shippingData.district,
       shippingData.province, shippingData.notes || null,
+      paymentProofUrl // Attached for QR transfers
     ]
   );
   return result.rows[0];
@@ -259,5 +260,44 @@ exports.khaltiVerify = async (req, res) => {
   } catch (err) {
     console.error("Khalti Verify Error:", err.response?.data || err.message);
     res.redirect(`${process.env.CLIENT_URL}/orders?payment=failed`);
+  }
+};
+
+// ─── 6. Manual QR / Bank Transfer ─────────────────────────
+exports.processQRTransfer = async (req, res) => {
+  const userId = req.user.id;
+  const { bookId, shipping, paymentProofUrl } = req.body;
+
+  if (!bookId || !shipping?.name || !shipping?.phone || !shipping?.address || !paymentProofUrl) {
+    return res.status(400).json({ error: "Missing required fields or payment receipt." });
+  }
+
+  try {
+    const bookRes = await db.query("SELECT * FROM books WHERE id = $1 AND user_id = $2", [bookId, userId]);
+    if (!bookRes.rows.length) return res.status(404).json({ error: "Book not found" });
+
+    const order = await createOrderRecord({
+      userId, bookId, bookType: bookRes.rows[0].book_type,
+      paymentMethod: "qr_transfer", shippingData: shipping, paymentRef: `QR-${Date.now()}`,
+      paymentProofUrl // Added right here for the DB
+    });
+
+    // Update statuses
+    await db.query("UPDATE orders SET order_status = 'processing' WHERE id = $1", [order.id]);
+    await db.query("INSERT INTO order_status_history (order_id, status, note) VALUES ($1, 'processing', 'QR Payment Receipt Uploaded')", [order.id]);
+    await db.query("UPDATE books SET status = 'ordered', updated_at = NOW() WHERE id = $1", [bookId]);
+
+    // Send emails async
+    db.query("SELECT * FROM users WHERE id = $1", [userId]).then(userRes => {
+      if (userRes.rows[0]) {
+        sendOrderConfirmation(order, userRes.rows[0], bookRes.rows[0]).catch(e => console.error(e));
+        sendAdminOrderAlert(order, userRes.rows[0], bookRes.rows[0]).catch(e => console.error(e));
+      }
+    });
+
+    res.status(201).json({ success: true, orderId: order.id });
+  } catch (err) {
+    console.error("QR Transfer Error:", err);
+    res.status(500).json({ error: "Could not place order." });
   }
 };

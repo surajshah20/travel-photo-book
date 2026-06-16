@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Users, ShoppingBag, Package,
   TrendingUp, Clock, CheckCircle, Truck,
-  AlertCircle, ChevronLeft, ChevronRight, Search
+  AlertCircle, ChevronLeft, ChevronRight, Search, Eye
 } from "lucide-react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
@@ -302,12 +302,26 @@ const AdminPanel = () => {
                           </div>
                         )}
                       </td>
+                      
+                      {/* ✅ UPDATED COLUMN: Displays Price, Payment Method, and View Receipt Button */}
                       <td className="px-6 py-4 align-top">
                         <p className="text-sm font-black text-gray-900">Rs. {order.amount_npr}</p>
-                        <span className={`text-[10px] font-bold uppercase tracking-wider ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
-                          {order.payment_method} ({order.payment_status})
+                        <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 mt-1 ${order.payment_status === 'paid' ? 'text-green-600' : 'text-amber-600'}`}>
+                          {order.payment_method === 'qr_transfer' ? 'Manual QR' : order.payment_method} ({order.payment_status})
                         </span>
+                        
+                        {order.payment_method === 'qr_transfer' && order.payment_proof_url && (
+                          <a 
+                            href={order.payment_proof_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-1.5 rounded-md hover:bg-blue-100 transition-colors"
+                          >
+                            <Eye className="w-3 h-3" /> View Receipt
+                          </a>
+                        )}
                       </td>
+                      
                       <td className="px-6 py-4 align-top">
                         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ring-1 inset-ring ${STATUS_COLORS[order.order_status]}`}>
                           {order.order_status === "cancellation_requested" ? "Cancel Req." : order.order_status}

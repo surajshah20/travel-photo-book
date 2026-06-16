@@ -4,6 +4,9 @@ const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const paymentController = require("../controllers/paymentController");
 
+// ── Manual QR / Bank Transfer ─────────────────────────────
+router.post("/qr", authMiddleware, paymentController.processQRTransfer);
+
 // ── Cash on Delivery ──────────────────────────────────────
 router.post("/cod", authMiddleware, paymentController.processCOD);
 
