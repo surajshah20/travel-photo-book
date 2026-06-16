@@ -1,12 +1,11 @@
 // server/db/index.js
-
 const { Pool } = require("pg");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  connectionTimeoutMillis: 10000, // INCREASED to 10 seconds
   ssl: process.env.NODE_ENV === "production"
     ? { rejectUnauthorized: false }
     : false,
@@ -21,7 +20,7 @@ pool.query("SELECT NOW()").then(() => {
   console.log("✅ Database connected");
 }).catch(err => {
   console.error("❌ Database connection failed:", err.message);
-  process.exit(1);
+  // Optional: Comment out process.exit(1) if you want the server to keep trying
 });
 
 module.exports = pool;
