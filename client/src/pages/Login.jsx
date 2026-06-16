@@ -238,8 +238,9 @@ const Login = () => {
             <div className="bb-fade-up bb-fade-up-1" style={{ marginBottom: 20 }}>
               <button
                 className="bb-btn-google"
-                onClick={() => window.location.href = "http://localhost:5000/api/auth/google"}
-              >
+                onClick={() =>
+                  window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`
+                }              >
                 <GoogleIcon />
                 <span>Continue with Google</span>
               </button>
