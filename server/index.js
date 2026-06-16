@@ -44,8 +44,8 @@ app.use(
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error("CORS: Origin not allowed"));
-    },
+console.log("Blocked Origin:", origin);
+callback(new Error(`CORS: Origin not allowed -> ${origin}`));    },
     credentials: true, // ✅ REQUIRED FOR SECURE COOKIES
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
