@@ -2,8 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8aUZng7EyTv9bSyvWlMAnYpfGPBbMu6YcVQzaBoR8VsZYxE6O3CGgk1AW0spAIb
-
 -- Dumped from database version 18.1
 -- Dumped by pg_dump version 18.1
 
@@ -595,5 +593,4 @@ ALTER TABLE ONLY public.photos
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8aUZng7EyTv9bSyvWlMAnYpfGPBbMu6YcVQzaBoR8VsZYxE6O3CGgk1AW0spAIb
 

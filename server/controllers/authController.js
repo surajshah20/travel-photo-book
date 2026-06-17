@@ -14,18 +14,19 @@ const signToken = (user) =>
     { 
       id: user.id, 
       email: user.email, 
-      is_admin: user.is_admin // ✅ Added admin flag to the secure payload
+      is_admin: user.is_admin 
     },
     process.env.JWT_SECRET,
     { expiresIn: "7d" }
   );
 
-// ✅ Helper to attach secure cookie
+// ✅ Helper to attach secure cookie (CROSS-DOMAIN FIX)
 const setAuthCookie = (res, token) => {
+  const isProd = process.env.NODE_ENV === "production";
   res.cookie("token", token, {
     httpOnly: true, // Blocks JavaScript from reading the cookie (prevents XSS)
-    secure: process.env.NODE_ENV === "production", // HTTPS only in prod
-    sameSite: "lax",
+    secure: isProd, // MUST be true for sameSite 'none' to work
+    sameSite: isProd ? "none" : "lax", // 'none' allows Vercel -> Render communication
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
 };
@@ -69,8 +70,8 @@ const register = async (req, res) => {
     const user = result.rows[0];
     const token = signToken(user);
     
-    setAuthCookie(res, token); // ✅ Issue Cookie
-    res.status(201).json({ user }); // ✅ Removed token from payload
+    setAuthCookie(res, token); // Issue Secure Cross-Domain Cookie
+    res.status(201).json({ user }); 
   } catch (err) {
     console.error("Register error:", err);
     res.status(500).json({ error: "Registration failed. Please try again." });
@@ -112,8 +113,8 @@ const login = async (req, res) => {
     const { password: _pw, ...safeUser } = user;
     const token = signToken(safeUser);
     
-    setAuthCookie(res, token); // ✅ Issue Cookie
-    res.json({ user: safeUser }); // ✅ Removed token from payload
+    setAuthCookie(res, token); // Issue Secure Cross-Domain Cookie
+    res.json({ user: safeUser }); 
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ error: "Login failed. Please try again." });
@@ -122,11 +123,13 @@ const login = async (req, res) => {
 
 // ─── Logout ───────────────────────────────────────────────
 const logout = (req, res) => {
-  // ✅ Tell the browser to delete the cookie
+  const isProd = process.env.NODE_ENV === "production";
+  
+  // Must exactly match the options used to set the cookie
   res.clearCookie("token", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
   });
   res.json({ message: "Logged out successfully" });
 };
@@ -136,7 +139,7 @@ const verifyToken = async (req, res) => {
   try {
     const result = await db.query(
       `SELECT ${SAFE_USER_FIELDS} FROM users WHERE id = $1`,
-      [req.user.id] // req.user comes from your authMiddleware verifying the cookie
+      [req.user.id] // req.user comes from authMiddleware
     );
     if (!result.rows.length) {
       return res.status(401).json({ error: "User not found" });
@@ -157,20 +160,16 @@ const googleCallback = async (req, res) => {
     }
 
     const token = signToken(user);
-    setAuthCookie(res, token); // ✅ Securely issue cookie
+    setAuthCookie(res, token); // Issue Secure Cross-Domain Cookie
 
-    // ✅ Clean redirect URL without exposing the token
-    res.redirect(
-      `${process.env.CLIENT_URL}/auth/callback` +
-      `?name=${encodeURIComponent(user.name)}` +
-      `&email=${encodeURIComponent(user.email)}` +
-      `&id=${user.id}`
-    );
+    // ✅ Clean redirect URL WITHOUT exposing user data.
+    // The frontend AuthCallback will automatically fetch the user via the secure cookie.
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback`);
+    
   } catch (err) {
     console.error("Google callback error:", err);
     res.redirect(`${process.env.CLIENT_URL}/login?error=server_error`);
   }
 };
 
-// Export logout as well
 module.exports = { register, login, logout, verifyToken, googleCallback };

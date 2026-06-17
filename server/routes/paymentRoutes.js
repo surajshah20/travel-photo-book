@@ -1,8 +1,17 @@
-// server/routes/paymentRoutes.js
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const authMiddleware = require("../middleware/authMiddleware");
 const paymentController = require("../controllers/paymentController");
+
+// ── Security: Configure Multer (Memory Storage + 5MB Limit) ─
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // Blocks massive payload attacks
+});
+
+// ── Secure Receipt Upload (NEW) ───────────────────────────
+router.post("/upload-receipt", authMiddleware, upload.single("receipt"), paymentController.uploadReceipt);
 
 // ── Manual QR / Bank Transfer ─────────────────────────────
 router.post("/qr", authMiddleware, paymentController.processQRTransfer);

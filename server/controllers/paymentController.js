@@ -1,8 +1,7 @@
-// server/controllers/paymentController.js
-
 const db = require("../db");
 const crypto = require("crypto");
 const axios = require("axios");
+const cloudinary = require("../config/cloudinary"); // ✅ Import your secure cloudinary config
 const {
   sendOrderConfirmation,
   sendAdminOrderAlert,
@@ -41,10 +40,34 @@ const createOrderRecord = async ({
       shippingData.name, shippingData.phone, shippingData.address,
       shippingData.city, shippingData.district,
       shippingData.province, shippingData.notes || null,
-      paymentProofUrl // Attached for QR transfers
+      paymentProofUrl
     ]
   );
   return result.rows[0];
+};
+
+// ─── 0. Secure Receipt Upload (NEW) ───────────────────────
+exports.uploadReceipt = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "No receipt file provided." });
+    }
+
+    // Convert memory buffer to Base64 to send to Cloudinary safely
+    const b64 = Buffer.from(req.file.buffer).toString("base64");
+    let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+    
+    // Secure server-to-server upload (Bypasses frontend exposure)
+    const uploadResponse = await cloudinary.uploader.upload(dataURI, {
+      folder: "blushbook_receipts",
+      resource_type: "auto",
+    });
+
+    res.json({ secure_url: uploadResponse.secure_url });
+  } catch (err) {
+    console.error("Receipt Upload Error:", err);
+    res.status(500).json({ error: "Failed to upload receipt to secure storage." });
+  }
 };
 
 // ─── 1. Cash on Delivery (COD) ────────────────────────────
@@ -65,12 +88,10 @@ exports.processCOD = async (req, res) => {
       paymentMethod: "cod", shippingData: shipping, paymentRef: `COD-${Date.now()}`
     });
 
-    // Update statuses
     await db.query("UPDATE orders SET order_status = 'processing' WHERE id = $1", [order.id]);
     await db.query("INSERT INTO order_status_history (order_id, status, note) VALUES ($1, 'processing', 'COD Order Placed')", [order.id]);
     await db.query("UPDATE books SET status = 'ordered', updated_at = NOW() WHERE id = $1", [bookId]);
 
-    // Send emails async
     db.query("SELECT * FROM users WHERE id = $1", [userId]).then(userRes => {
       if (userRes.rows[0]) {
         sendOrderConfirmation(order, userRes.rows[0], bookRes.rows[0]).catch(e => console.error(e));
@@ -85,7 +106,7 @@ exports.processCOD = async (req, res) => {
   }
 };
 
-// ─── 2. eSewa Initiate (Cryptographically Secured) ────────
+// ─── 2. eSewa Initiate ────────────────────────────────────
 exports.esewaInitiate = async (req, res) => {
   const userId = req.user.id;
   const { bookId, shipping } = req.body;
@@ -99,7 +120,6 @@ exports.esewaInitiate = async (req, res) => {
       paymentMethod: "esewa", shippingData: shipping, paymentRef: "pending"
     });
 
-    // Generate eSewa Signature (Prevents frontend tampering)
     const transaction_uuid = `BB-${order.id}-${Date.now()}`;
     const merchantCode = process.env.ESEWA_MERCHANT_CODE || "EPAYTEST";
     const secretKey = process.env.ESEWA_SECRET_KEY || "8gBm/:&EnhH.1/q";
@@ -110,7 +130,7 @@ exports.esewaInitiate = async (req, res) => {
     await db.query("UPDATE orders SET payment_ref = $1 WHERE id = $2", [transaction_uuid, order.id]);
 
     res.json({
-      paymentUrl: "https://rc-epay.esewa.com.np/api/epay/main/v2/form", // Change to production URL when live
+      paymentUrl: "https://rc-epay.esewa.com.np/api/epay/main/v2/form",
       formData: {
         amount: order.amount_npr,
         tax_amount: "0",
@@ -131,7 +151,7 @@ exports.esewaInitiate = async (req, res) => {
   }
 };
 
-// ─── 3. eSewa Verify (Server-to-Server Validation) ────────
+// ─── 3. eSewa Verify ──────────────────────────────────────
 exports.esewaVerify = async (req, res) => {
   const { data } = req.query;
   if (!data) return res.redirect(`${process.env.CLIENT_URL}/orders?payment=failed`);
@@ -140,14 +160,12 @@ exports.esewaVerify = async (req, res) => {
     const decodedStr = Buffer.from(data, "base64").toString("utf-8");
     const esewaRes = JSON.parse(decodedStr);
     
-    // Extract Order ID (BB-{orderId}-{timestamp})
     const orderId = esewaRes.transaction_uuid.split("-")[1];
 
     if (esewaRes.status !== "COMPLETE") {
       return res.redirect(`${process.env.CLIENT_URL}/orders?payment=failed`);
     }
 
-    // Mark as paid
     const result = await db.query(
       `UPDATE orders SET payment_status = 'paid', payment_id = $1, payment_raw = $2, paid_at = NOW(), order_status = 'confirmed', updated_at = NOW() WHERE id = $3 RETURNING *`,
       [esewaRes.transaction_code, decodedStr, orderId]
@@ -157,7 +175,6 @@ exports.esewaVerify = async (req, res) => {
     await db.query("INSERT INTO order_status_history (order_id, status, note) VALUES ($1, 'confirmed', 'eSewa Payment Verified')", [orderId]);
     await db.query("UPDATE books SET status = 'ordered', updated_at = NOW() WHERE id = $1", [order.book_id]);
 
-    // Send Emails async
     db.query("SELECT * FROM users WHERE id = $1", [order.user_id]).then(userRes => {
       db.query("SELECT * FROM books WHERE id = $1", [order.book_id]).then(bookRes => {
         sendOrderConfirmation(order, userRes.rows[0], bookRes.rows[0]).catch(e => {});
@@ -188,11 +205,10 @@ exports.khaltiInitiate = async (req, res) => {
       paymentMethod: "khalti", shippingData: shipping, paymentRef: "pending"
     });
 
-    // Call Khalti API
     const khaltiPayload = {
       return_url: `${process.env.API_URL || "http://localhost:5000"}/api/payments/khalti/verify`,
       website_url: process.env.CLIENT_URL || "http://localhost:5173",
-      amount: order.amount, // Khalti requires Paisa
+      amount: order.amount,
       purchase_order_id: String(order.id),
       purchase_order_name: `BlushBook - ${bookRes.rows[0].title || 'Photo Book'}`,
       customer_info: {
@@ -204,7 +220,7 @@ exports.khaltiInitiate = async (req, res) => {
 
     const response = await axios.post("https://a.khalti.com/api/v2/epayment/initiate/", khaltiPayload, {
       headers: {
-        "Authorization": `Key ${process.env.KHALTI_SECRET_KEY}`, // Add to your .env
+        "Authorization": `Key ${process.env.KHALTI_SECRET_KEY}`,
         "Content-Type": "application/json"
       }
     });
@@ -218,7 +234,7 @@ exports.khaltiInitiate = async (req, res) => {
   }
 };
 
-// ─── 5. Khalti Verify (Server Lookup) ─────────────────────
+// ─── 5. Khalti Verify ─────────────────────────────────────
 exports.khaltiVerify = async (req, res) => {
   const { pidx, purchase_order_id, status } = req.query;
 
@@ -226,7 +242,6 @@ exports.khaltiVerify = async (req, res) => {
   if (!pidx || status !== "Completed") return res.redirect(`${process.env.CLIENT_URL}/orders?payment=failed`);
 
   try {
-    // Perform server-to-server lookup to guarantee fraud prevention
     const response = await axios.post("https://a.khalti.com/api/v2/epayment/lookup/", { pidx }, {
       headers: {
         "Authorization": `Key ${process.env.KHALTI_SECRET_KEY}`,
@@ -238,7 +253,6 @@ exports.khaltiVerify = async (req, res) => {
       return res.redirect(`${process.env.CLIENT_URL}/orders?payment=failed`);
     }
 
-    // Mark as paid
     const result = await db.query(
       `UPDATE orders SET payment_status = 'paid', payment_id = $1, payment_raw = $2, paid_at = NOW(), order_status = 'confirmed', updated_at = NOW() WHERE id = $3 RETURNING *`,
       [response.data.transaction_id, JSON.stringify(response.data), purchase_order_id]
@@ -248,7 +262,6 @@ exports.khaltiVerify = async (req, res) => {
     await db.query("INSERT INTO order_status_history (order_id, status, note) VALUES ($1, 'confirmed', 'Khalti Payment Verified')", [order.id]);
     await db.query("UPDATE books SET status = 'ordered', updated_at = NOW() WHERE id = $1", [order.book_id]);
 
-    // Send Emails async
     db.query("SELECT * FROM users WHERE id = $1", [order.user_id]).then(userRes => {
       db.query("SELECT * FROM books WHERE id = $1", [order.book_id]).then(bookRes => {
         sendOrderConfirmation(order, userRes.rows[0], bookRes.rows[0]).catch(e => {});
@@ -279,15 +292,13 @@ exports.processQRTransfer = async (req, res) => {
     const order = await createOrderRecord({
       userId, bookId, bookType: bookRes.rows[0].book_type,
       paymentMethod: "qr_transfer", shippingData: shipping, paymentRef: `QR-${Date.now()}`,
-      paymentProofUrl // Added right here for the DB
+      paymentProofUrl 
     });
 
-    // Update statuses
     await db.query("UPDATE orders SET order_status = 'processing' WHERE id = $1", [order.id]);
     await db.query("INSERT INTO order_status_history (order_id, status, note) VALUES ($1, 'processing', 'QR Payment Receipt Uploaded')", [order.id]);
     await db.query("UPDATE books SET status = 'ordered', updated_at = NOW() WHERE id = $1", [bookId]);
 
-    // Send emails async
     db.query("SELECT * FROM users WHERE id = $1", [userId]).then(userRes => {
       if (userRes.rows[0]) {
         sendOrderConfirmation(order, userRes.rows[0], bookRes.rows[0]).catch(e => console.error(e));
