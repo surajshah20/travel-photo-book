@@ -16,6 +16,7 @@ import book4 from "../assets/lovestory.jpg";
 import qualityImage from "../assets/book1.jpg";
 import Logo from "../design-system/Logo";
 import { C } from "../design-system/index";
+import { Link } from "react-router-dom";
 
 /* ─── DESIGN TOKENS ──────────────────────────────────────── */
 // const C = {
@@ -1334,7 +1335,8 @@ const LandingPage = () => {
                 <h4 style={{ color: "#fff", fontWeight: 700, fontSize: 12, margin: "0 0 20px", letterSpacing: "0.08em", textTransform: "uppercase" }}>
                   Support
                 </h4>
-                {["Help centre", "Order tracking", "Returns", "Privacy policy", "Terms"].map((l) => (
+
+                {["Help centre", "Order tracking", "Returns"].map((l) => (
                   <p
                     key={l}
                     style={{ fontSize: 13.5, color: "#5A5A5A", margin: "0 0 13px", cursor: "pointer", transition: "color 0.18s", fontWeight: 400 }}
@@ -1343,6 +1345,21 @@ const LandingPage = () => {
                   >
                     {l}
                   </p>
+                ))}
+
+                {[
+                  { label: "Privacy policy", to: "/privacy" },
+                  { label: "Terms", to: "/terms" },
+                ].map((item) => (
+                  <Link
+                    key={item.label}
+                    to={item.to}
+                    style={{ display: "block", fontSize: 13.5, color: "#5A5A5A", margin: "0 0 13px", textDecoration: "none", transition: "color 0.18s", fontWeight: 400 }}
+                    onMouseEnter={e => e.target.style.color = "#fff"}
+                    onMouseLeave={e => e.target.style.color = "#5A5A5A"}
+                  >
+                    {item.label}
+                  </Link>
                 ))}
               </div>
             </div>
