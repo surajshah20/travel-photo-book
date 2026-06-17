@@ -5,12 +5,19 @@ const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const db = require("../db");
 
+// ✅ Bulletproof Callback URL routing
+const isProd = process.env.NODE_ENV === "production";
+const CALLBACK_URL = isProd 
+  ? "https://blushbook-api.onrender.com/api/auth/google/callback" 
+  : "http://localhost:5000/api/auth/google/callback";
+
 passport.use(
   new GoogleStrategy(
     {
       clientID: process.env.GOOGLE_CLIENT_ID,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-      callbackURL: process.env.GOOGLE_CALLBACK_URL,
+      callbackURL: CALLBACK_URL, // ✅ Uses the bulletproof URL
+      proxy: true // ✅ CRITICAL: Tells Passport to trust the Render/Cloudflare proxy for HTTPS
     },
     async (accessToken, refreshToken, profile, done) => {
       try {
