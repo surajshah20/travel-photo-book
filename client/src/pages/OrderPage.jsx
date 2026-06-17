@@ -1,7 +1,7 @@
 // client/src/pages/OrderPage.jsx
 // BlushBook — Production Order Page (eSewa + Khalti + Manual QR)
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Package, MapPin, Phone, User,
@@ -83,6 +83,8 @@ const OrderPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const isSubmittingRef = useRef(false); // Idempotency Guard
+
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -107,7 +109,7 @@ const OrderPage = () => {
       .then(res => setBook(res.data))
       .catch(() => navigate("/dashboard"))
       .finally(() => setLoading(false));
-  }, [bookId]);
+  }, [bookId, navigate]);
 
   const price = BOOK_PRICES[book?.book_type] || BOOK_PRICES.default;
   const shipping_charge = 150;
@@ -146,31 +148,33 @@ const OrderPage = () => {
   };
 
   const handleSubmit = async () => {
+    // Prevent double-clicks bypassing React's state batching
+    if (isSubmittingRef.current) return;
+
     if (!validate()) {
-      // Smoothly scroll up to the shipping form if there are errors
       document.getElementById('shipping-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
+
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setServerError("");
 
     try {
       let paymentProofUrl = "";
 
-      // 1. Upload QR Screenshot if applicable
+      // 1. SECURE BACKEND UPLOAD
       if (paymentMethod === "qr_transfer" && qrFile) {
         const formData = new FormData();
-        formData.append("file", qrFile);
-        formData.append("upload_preset", "blushbook_receipts");
+        formData.append("receipt", qrFile);
 
-        const cloudRes = await fetch("https://api.cloudinary.com/v1_1/durj9snai/image/upload", {
-          method: "POST",
-          body: formData,
+        // Hit our authenticated Express endpoint instead of Cloudinary directly
+        const uploadRes = await api.post("/payments/upload-receipt", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
         });
 
-        if (!cloudRes.ok) throw new Error("Failed to upload payment receipt.");
-        const cloudData = await cloudRes.json();
-        paymentProofUrl = cloudData.secure_url;
+        if (!uploadRes.data.secure_url) throw new Error("Failed to upload payment receipt.");
+        paymentProofUrl = uploadRes.data.secure_url;
       }
 
       // 2. Prepare Payload
@@ -178,7 +182,7 @@ const OrderPage = () => {
         bookId: parseInt(bookId),
         bookType: book?.book_type || "hardcover",
         shipping,
-        paymentProofUrl // Attached for the backend to save
+        paymentProofUrl // Secured URL returned from backend
       };
 
       // 3. Process Route
@@ -203,7 +207,8 @@ const OrderPage = () => {
 
       } else if (paymentMethod === "khalti") {
         const res = await api.post("/payments/khalti/initiate", payload);
-        window.location.href = res.data.paymentUrl;
+        // Use replace to prevent back-button loops
+        window.location.replace(res.data.paymentUrl); 
 
       } else if (paymentMethod === "cod") {
         const res = await api.post("/payments/cod", payload);
@@ -215,6 +220,7 @@ const OrderPage = () => {
       setServerError(err.response?.data?.error || err.message || "Could not place order. Please try again.");
     } finally {
       setSubmitting(false);
+      isSubmittingRef.current = false; // Reset guard
     }
   };
 

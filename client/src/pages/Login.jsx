@@ -65,6 +65,14 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // ✅ Dynamic Google Login Handler for Production
+  const handleGoogleLogin = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    // Strip trailing /api to prevent /api/api/auth/google
+    const baseUrl = apiUrl.replace(/\/api$/, "");
+    window.location.href = `${baseUrl}/api/auth/google`;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData((p) => ({ ...p, [name]: type === "checkbox" ? checked : value }));
@@ -238,9 +246,8 @@ const Login = () => {
             <div className="bb-fade-up bb-fade-up-1" style={{ marginBottom: 20 }}>
               <button
                 className="bb-btn-google"
-                onClick={() =>
-                  window.location.href = `${import.meta.env.VITE_API_URL}/api/auth/google`
-                }              >
+                onClick={handleGoogleLogin}
+              >
                 <GoogleIcon />
                 <span>Continue with Google</span>
               </button>

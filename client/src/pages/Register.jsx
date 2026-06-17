@@ -71,6 +71,14 @@ const Register = () => {
   ];
   const strength = rules.filter((r) => r.met).length;
 
+  // ✅ Dynamic Google Login Handler for Production
+  const handleGoogleLogin = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+    // Strip trailing /api to prevent /api/api/auth/google
+    const baseUrl = apiUrl.replace(/\/api$/, "");
+    window.location.href = `${baseUrl}/api/auth/google`;
+  };
+
   const handleChange = (e) => {
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
     if (errors[e.target.name]) setErrors((p) => ({ ...p, [e.target.name]: "" }));
@@ -165,7 +173,7 @@ const Register = () => {
             <div className="bb-fade-up bb-fade-up-1" style={{ marginBottom: 20 }}>
               <button
                 className="bb-btn-google"
-                onClick={() => window.location.href = "http://localhost:5000/api/auth/google"}
+                onClick={handleGoogleLogin}
               >
                 <GoogleIcon />
                 <span>Continue with Google</span>

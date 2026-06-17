@@ -7,6 +7,7 @@ import { CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import Logo from "../design-system/Logo";
 import { C } from "../design-system/index";
+import api from "../api/axios"; // ✅ Make sure to import your axios instance
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -22,50 +23,45 @@ const AuthCallback = () => {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    // Notice: We NO LONGER extract a token here. The secure httpOnly cookie handles it!
-    const name = searchParams.get("name");
-    const email = searchParams.get("email");
-    const id = searchParams.get("id");
-    const error = searchParams.get("error");
+    const verifyOAuthSession = async () => {
+      // 1. Check if the backend intentionally sent us an error flag
+      const error = searchParams.get("error");
+      
+      if (error) {
+        setStatus("error");
+        setTimeout(() => navigate("/login?error=oauth_failed", { replace: true }), 2000);
+        return;
+      }
 
-    // ❌ OAuth error from backend
-    if (error) {
-      setStatus("error");
-      setTimeout(() => navigate("/login?error=oauth_failed", { replace: true }), 2000);
-      return;
-    }
+      // 2. SECURE HANDOFF: Fetch the user directly from the backend
+      // The backend should have just set an HttpOnly cookie during the Google OAuth redirect.
+      // We ask the backend "Who is attached to this cookie?" instead of trusting the URL.
+      try {
+        const res = await api.get("/auth/verify");
+        const user = res.data.user;
 
-    // ❌ Missing required data
-    if (!email || !id) {
-      setStatus("error");
-      setTimeout(() => navigate("/login", { replace: true }), 2000);
-      return;
-    }
+        if (!user) throw new Error("No user data returned from verification");
 
-    // ✅ Create user object safely
-    const user = {
-      id: parseInt(id),
-      name: name ? decodeURIComponent(name) : "",
-      email: decodeURIComponent(email),
+        // 3. Save verified auth state to context
+        loginUser(user);
+        setStatus("success");
+
+        // 4. Redirect to workspace
+        setTimeout(() => {
+          navigate("/dashboard", { replace: true });
+        }, 1000);
+
+      } catch (err) {
+        console.error("OAuth verification failed:", err);
+        setStatus("error");
+
+        setTimeout(() => {
+          navigate("/login?error=auth_verification_failed", { replace: true });
+        }, 2000);
+      }
     };
 
-    try {
-      // ✅ Save auth state (no token needed, cookie is already set by backend)
-      loginUser(user);
-      setStatus("success");
-
-      // ✅ Redirect after short delay
-      setTimeout(() => {
-        navigate("/dashboard", { replace: true });
-      }, 1000);
-    } catch (err) {
-      console.error("Login callback error:", err);
-      setStatus("error");
-
-      setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 2000);
-    }
+    verifyOAuthSession();
   }, [searchParams, navigate, loginUser]);
 
   return (
@@ -99,7 +95,7 @@ const AuthCallback = () => {
               Securely signing you in...
             </h2>
             <p style={{ fontSize: 13, color: C.muted, margin: 0 }}>
-              Please wait while we set up your session.
+              Verifying your secure session credentials.
             </p>
           </div>
         )}
