@@ -72,11 +72,16 @@ const Register = () => {
   const strength = rules.filter((r) => r.met).length;
 
   // ✅ Dynamic Google Login Handler for Production
+  // ✅ Bulletproof Google Login Handler
   const handleGoogleLogin = () => {
-    const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-    // Strip trailing /api to prevent /api/api/auth/google
-    const baseUrl = apiUrl.replace(/\/api$/, "");
-    window.location.href = `${baseUrl}/api/auth/google`;
+    // If we are on the live site, ALWAYS use the Render backend.
+    // If we are on localhost, use the local backend.
+    const isProd = window.location.hostname !== "localhost";
+    const backendUrl = isProd 
+      ? "https://blushbook-api.onrender.com" 
+      : "http://localhost:5000";
+      
+    window.location.href = `${backendUrl}/api/auth/google`;
   };
 
   const handleChange = (e) => {

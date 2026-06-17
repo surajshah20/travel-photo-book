@@ -89,6 +89,11 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: isProd ? "An unexpected error occurred" : err.message });
 });
 
+// ✅ Add this friendly root route so the API doesn't look broken
+app.get("/", (req, res) => {
+  res.json({ message: "BlushBook Production API is live and running! 🚀" });
+});
+
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
   if (err?.error?.name === "TimeoutError") return;
