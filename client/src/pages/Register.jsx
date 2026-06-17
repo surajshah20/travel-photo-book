@@ -78,7 +78,7 @@ const Register = () => {
     // If we are on localhost, use the local backend.
     const isProd = window.location.hostname !== "localhost";
     const backendUrl = isProd 
-      ? "https://blushbook-api.onrender.com" 
+      ? "https://api.getblushbook.com" 
       : "http://localhost:5000";
       
     window.location.href = `${backendUrl}/api/auth/google`;
