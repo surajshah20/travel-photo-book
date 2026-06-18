@@ -1,45 +1,231 @@
 // client/src/pages/Home.jsx
-// Blushbook — Production Customer Dashboard
+// FIXES: H1 (skeleton loaders), H8 (contrast), H9 (focus), H12 (tap targets)
+// FIXES: Mobile card layout, empty state quality, accessible status badges
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   BookOpen, Plus, Trash2, Edit3, Eye,
   ShoppingBag, LogOut, Clock, CheckCircle,
-  Package, ChevronRight, Images, MoreVertical,
-  Calendar, MapPin
+  Package, ChevronRight, Images,
+  Calendar, MapPin,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/axios";
 import AppNavbar from "../design-system/AppNavbar";
 
-// ─── REUSABLE COMPONENTS ──────────────────────────────────
-
-const StatCard = ({ icon, value, label }) => (
-  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
-    <div className="w-12 h-12 rounded-xl bg-gray-50 text-gray-600 flex items-center justify-center flex-shrink-0">
-      {icon}
-    </div>
-    <div>
-      <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1">{value}</p>
-      <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">{label}</p>
+// ─── SKELETON COMPONENTS (Fix H1) ────────────────────────
+const SkeletonCard = () => (
+  <div
+    style={{
+      background: "#fff",
+      borderRadius: 16,
+      border: "1px solid #F0F0F0",
+      overflow: "hidden",
+    }}
+    aria-hidden="true"
+  >
+    <div className="skeleton" style={{ aspectRatio: "3/4", width: "100%" }} />
+    <div style={{ padding: "16px" }}>
+      <div className="skeleton skeleton-title" style={{ width: "70%", marginBottom: 10 }} />
+      <div className="skeleton skeleton-text" style={{ width: "50%", marginBottom: 8 }} />
+      <div className="skeleton skeleton-text" style={{ width: "40%", marginBottom: 20 }} />
+      <div className="skeleton" style={{ height: 36, borderRadius: 10 }} />
     </div>
   </div>
 );
 
+const SkeletonStatCard = () => (
+  <div
+    style={{
+      background: "#fff",
+      borderRadius: 16,
+      border: "1px solid #F0F0F0",
+      padding: "20px",
+      display: "flex",
+      alignItems: "center",
+      gap: 16,
+    }}
+    aria-hidden="true"
+  >
+    <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 12, flexShrink: 0 }} />
+    <div style={{ flex: 1 }}>
+      <div className="skeleton skeleton-title" style={{ width: "60%", marginBottom: 8 }} />
+      <div className="skeleton skeleton-text" style={{ width: "80%" }} />
+    </div>
+  </div>
+);
+
+// ─── STAT CARD ────────────────────────────────────────────
+const StatCard = ({ icon, value, label }) => (
+  <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+    <div className="w-12 h-12 rounded-xl bg-gray-50 text-gray-600 flex items-center justify-center flex-shrink-0" aria-hidden="true">
+      {icon}
+    </div>
+    <div>
+      <p className="text-2xl font-bold text-gray-900 tracking-tight leading-none mb-1" aria-label={`${value} ${label}`}>
+        {value}
+      </p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{label}</p>
+    </div>
+  </div>
+);
+
+// ─── STATUS BADGE ─────────────────────────────────────────
+const STATUS_CONFIG = {
+  draft:    { label: "Draft",          classes: "bg-gray-100 text-gray-700"     },
+  complete: { label: "Ready to Print", classes: "bg-green-100 text-green-800"   },
+  ordered:  { label: "Ordered",        classes: "bg-blue-100 text-blue-800"     },
+};
+
 const StatusBadge = ({ status }) => {
-  const config = {
-    draft: { label: "Draft", classes: "bg-gray-100 text-gray-600" },
-    complete: { label: "Ready to Print", classes: "bg-green-100 text-green-700" },
-    ordered: { label: "Ordered", classes: "bg-blue-100 text-blue-700" },
-  };
-  const s = config[status] || { label: status, classes: "bg-gray-100 text-gray-600" };
+  const s = STATUS_CONFIG[status] || { label: status, classes: "bg-gray-100 text-gray-700" };
   return (
-    <span className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${s.classes}`}>
+    <span
+      className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${s.classes}`}
+      aria-label={`Status: ${s.label}`}
+    >
       {s.label}
     </span>
   );
 };
+
+// ─── BOOK CARD ────────────────────────────────────────────
+const BookCard = ({ book, onDelete, deletingId }) => {
+  const navigate = useNavigate();
+  const isDeleting = deletingId === book.id;
+  const photoCount = parseInt(book.photo_count) || 0;
+
+  const handleDelete = useCallback(async (e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete "${book.title || "this book"}"? This cannot be undone.`)) return;
+    onDelete(book.id);
+  }, [book.id, book.title, onDelete]);
+
+  const primaryAction = book.status === "complete"
+    ? { label: "Order Print", icon: <ShoppingBag className="w-4 h-4" aria-hidden="true" />, path: `/order/${book.id}` }
+    : book.status === "ordered"
+    ? { label: "Track Order", icon: <Package className="w-4 h-4" aria-hidden="true" />, path: "/orders" }
+    : { label: photoCount === 0 ? "Add Photos" : "Continue Editing", icon: <Edit3 className="w-4 h-4" aria-hidden="true" />, path: photoCount === 0 ? `/upload/${book.id}` : `/editor/${book.id}` };
+
+  return (
+    <article
+      className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300"
+      aria-label={`${book.title || "Untitled Book"} — ${STATUS_CONFIG[book.status]?.label || book.status}`}
+    >
+      {/* Cover Area */}
+      <div className="relative w-full bg-gray-100 rounded-t-2xl overflow-hidden" style={{ aspectRatio: "3/4" }}>
+        {book.cover_image_url ? (
+          <div className="relative w-full h-full">
+            <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/20 to-transparent z-10 rounded-tl-2xl" aria-hidden="true" />
+            <img
+              src={book.cover_image_url}
+              alt={`Cover of ${book.title || "Untitled Book"}`}
+              className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500"
+              loading="lazy"
+              width="300"
+              height="400"
+            />
+          </div>
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50">
+            <Images className="w-8 h-8 text-gray-300 mb-2" aria-hidden="true" />
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">No Cover</span>
+          </div>
+        )}
+
+        {/* Floating actions overlay */}
+        <div
+          className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[2px]"
+          aria-hidden="true"
+        >
+          <button
+            onClick={(e) => { e.stopPropagation(); navigate(`/preview/${book.id}`); }}
+            className="w-11 h-11 bg-white text-gray-900 rounded-full flex items-center justify-center hover:bg-gray-100 hover:scale-110 transition-all shadow-lg"
+            aria-label={`Preview ${book.title || "book"}`}
+            tabIndex={-1}
+          >
+            <Eye className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="w-11 h-11 bg-white text-red-600 rounded-full flex items-center justify-center hover:bg-red-50 hover:scale-110 transition-all shadow-lg disabled:opacity-50"
+            aria-label={`Delete ${book.title || "book"}`}
+            tabIndex={-1}
+          >
+            {isDeleting ? (
+              <span className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" aria-hidden="true" />
+            ) : (
+              <Trash2 className="w-4 h-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Metadata */}
+      <div className="p-5 flex flex-col flex-1">
+        <div className="flex justify-between items-start mb-2 gap-2">
+          <h3 className="font-bold text-gray-900 text-base truncate font-display">
+            {book.title || "Untitled Book"}
+          </h3>
+          <StatusBadge status={book.status} />
+        </div>
+
+        {book.destination && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1">
+            <MapPin className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+            <span className="truncate">{book.destination}</span>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-4">
+          <Calendar className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
+          <time dateTime={book.updated_at}>
+            Edited {new Date(book.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </time>
+        </div>
+
+        <div className="mt-auto pt-4 border-t border-gray-50">
+          <button
+            onClick={() => navigate(primaryAction.path)}
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-bold transition-colors min-h-[44px] ${
+              book.status === "complete"
+                ? "bg-gray-900 text-white hover:bg-rose-500"
+                : book.status === "ordered"
+                ? "bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-100"
+                : "bg-white border border-gray-200 text-gray-700 hover:border-gray-900 hover:text-gray-900"
+            }`}
+            aria-label={`${primaryAction.label} for ${book.title || "this book"}`}
+          >
+            {primaryAction.icon}
+            {primaryAction.label}
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+};
+
+// ─── EMPTY STATE ──────────────────────────────────────────
+const EmptyWorkspace = ({ onCreateClick }) => (
+  <div className="flex flex-col items-center justify-center py-20 px-6 border-2 border-dashed border-gray-200 rounded-3xl bg-white text-center">
+    <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mb-5" aria-hidden="true">
+      <BookOpen className="w-9 h-9 text-gray-300" />
+    </div>
+    <h3 className="text-xl font-bold text-gray-900 mb-2 font-display">Your workspace is empty</h3>
+    <p className="text-gray-500 text-sm max-w-xs mb-7 leading-relaxed">
+      Upload your photos and let AI build your first photo book in seconds.
+    </p>
+    <button
+      onClick={onCreateClick}
+      className="inline-flex items-center gap-2 bg-gray-900 text-white px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-rose-500 transition-colors min-h-[48px]"
+    >
+      <Plus className="w-4 h-4" aria-hidden="true" />
+      Create your first book
+    </button>
+  </div>
+);
 
 // ─── MAIN DASHBOARD ───────────────────────────────────────
 const Home = () => {
@@ -53,353 +239,310 @@ const Home = () => {
   const [activeFilter, setActiveFilter] = useState("all");
 
   useEffect(() => {
+    let cancelled = false;
     const loadData = async () => {
       try {
         const [booksRes, ordersRes] = await Promise.all([
           api.get("/books"),
           api.get("/orders"),
         ]);
-        setBooks(booksRes.data);
-        setOrders(ordersRes.data);
+        if (!cancelled) {
+          setBooks(booksRes.data);
+          setOrders(ordersRes.data);
+        }
       } catch (err) {
         console.error(err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadData();
+    return () => { cancelled = true; };
   }, []);
 
-  const handleDelete = async (bookId, e) => {
-    e.stopPropagation();
-    if (!window.confirm("Are you sure you want to delete this book? This cannot be undone.")) return;
+  const handleDelete = useCallback(async (bookId) => {
     setDeletingId(bookId);
     try {
       await api.delete(`/books/${bookId}`);
-      setBooks(books.filter((b) => b.id !== bookId));
+      setBooks(prev => prev.filter(b => b.id !== bookId));
     } catch (err) {
       console.error(err);
+      alert("Failed to delete. Please try again.");
     } finally {
       setDeletingId(null);
     }
-  };
+  }, []);
 
   const filteredBooks = activeFilter === "all"
     ? books
-    : books.filter((b) => b.status === activeFilter);
+    : books.filter(b => b.status === activeFilter);
 
   const filters = [
-    { id: "all", label: "All Books" },
-    { id: "draft", label: "In Progress" },
-    { id: "complete", label: "Ready to Order" },
-    { id: "ordered", label: "Ordered" },
+    { id: "all",      label: "All" },
+    { id: "draft",    label: "In Progress" },
+    { id: "complete", label: "Ready" },
+    { id: "ordered",  label: "Ordered" },
+  ];
+
+  const statsData = [
+    { icon: <Images className="w-5 h-5" aria-hidden="true" />,      value: books.length,                             label: "Books" },
+    { icon: <Clock className="w-5 h-5" aria-hidden="true" />,       value: books.filter(b => b.status === "draft").length,    label: "Drafts" },
+    { icon: <CheckCircle className="w-5 h-5" aria-hidden="true" />, value: books.filter(b => b.status === "complete").length, label: "Ready" },
+    { icon: <Package className="w-5 h-5" aria-hidden="true" />,     value: orders.length,                            label: "Orders" },
   ];
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] font-sans">
       <AppNavbar />
 
-      <main className="max-w-7xl mx-auto px-6 py-10">
-        
-        {/* ─── HEADER AREA ─────────────────────────────────── */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 md:py-10" id="main-content">
+
+        {/* ─── HEADER ──────────────────────────────────── */}
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-5 mb-8">
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 tracking-tight font-display mb-2">
-              Welcome back, {user?.name?.split(" ")[0]}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight font-display mb-1">
+              Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""}
             </h1>
-            <p className="text-gray-500 text-sm">
-              Manage your photo books and track your recent orders.
-            </p>
+            <p className="text-gray-500 text-sm">Manage your photo books and orders.</p>
           </div>
           <button
             onClick={() => navigate("/create")}
-            className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-full text-sm font-semibold hover:bg-rose-500 transition-colors shadow-sm"
+            className="inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-5 py-3 rounded-full text-sm font-semibold hover:bg-rose-500 transition-colors shadow-sm min-h-[48px] self-start sm:self-auto"
+            aria-label="Create a new photo book"
           >
-            <Plus className="w-4 h-4" />
-            Create New Book
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            New Book
           </button>
         </header>
 
-        {/* ─── QUICK STATS ─────────────────────────────────── */}
-        {!loading && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12">
-            <StatCard 
-              icon={<Images className="w-5 h-5" />} 
-              value={books.length} 
-              label="Total Books" 
-            />
-            <StatCard 
-              icon={<Clock className="w-5 h-5" />} 
-              value={books.filter(b => b.status === "draft").length} 
-              label="In Progress" 
-            />
-            <StatCard 
-              icon={<CheckCircle className="w-5 h-5" />} 
-              value={books.filter(b => b.status === "complete").length} 
-              label="Ready to Print" 
-            />
-            <StatCard 
-              icon={<Package className="w-5 h-5" />} 
-              value={orders.length} 
-              label="Total Orders" 
-            />
+        {/* ─── STATS ───────────────────────────────────── */}
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10" aria-busy="true" aria-label="Loading statistics">
+            {[...Array(4)].map((_, i) => <SkeletonStatCard key={i} />)}
           </div>
+        ) : (
+          <section aria-label="Your statistics" className="mb-10">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {statsData.map(s => <StatCard key={s.label} {...s} />)}
+            </div>
+          </section>
         )}
 
-        {/* ─── WORKSPACE DIVIDER ──────────────────────────── */}
-        <div className="flex flex-col lg:flex-row gap-10">
-          
-          {/* LEFT: MY BOOKS (Takes up 2/3 width on large screens) */}
-          <section className="flex-1 min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-              <h2 className="text-xl font-bold text-gray-900 font-display">My Workspace</h2>
-              
-              {/* Filter Pills */}
-              <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 hide-scrollbar">
-                {filters.map((filter) => (
+        {books.length > 0 && (
+  <section className="mb-10">
+    <div className="bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-100 rounded-3xl p-6">
+      <h2 className="text-xl font-bold text-gray-900 mb-2">
+        ✨ Ready for your next story?
+      </h2>
+
+      <p className="text-sm text-gray-600 mb-4">
+        You've already created {books.length} book{books.length > 1 ? "s" : ""}.
+        Start another memory book today.
+      </p>
+
+      <button
+        onClick={() => navigate("/create")}
+        className="bg-gray-900 text-white px-6 py-3 rounded-full font-semibold hover:bg-rose-500 transition-colors"
+      >
+        Create Another Book
+      </button>
+    </div>
+  </section>
+)}
+
+        {/* ─── WORKSPACE ───────────────────────────────── */}
+        <div className="flex flex-col lg:flex-row gap-8">
+
+          {/* LEFT: BOOKS */}
+          <section className="flex-1 min-w-0" aria-label="My books workspace">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+              <h2 className="text-lg font-bold text-gray-900 font-display">My Workspace</h2>
+
+              {/* Filter pills */}
+              <div
+                className="flex gap-1.5 overflow-x-auto pb-1 hide-scrollbar"
+                role="tablist"
+                aria-label="Filter books"
+              >
+                {filters.map(f => (
                   <button
-                    key={filter.id}
-                    onClick={() => setActiveFilter(filter.id)}
-                    className={`whitespace-nowrap px-4 py-1.5 rounded-full text-xs font-semibold transition-colors
-                      ${activeFilter === filter.id
-                        ? "bg-gray-200 text-gray-900"
-                        : "bg-transparent text-gray-500 hover:bg-gray-100"
-                      }`}
+                    key={f.id}
+                    role="tab"
+                    aria-selected={activeFilter === f.id}
+                    onClick={() => setActiveFilter(f.id)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-xs font-semibold transition-colors min-h-[36px] ${
+                      activeFilter === f.id
+                        ? "bg-gray-900 text-white"
+                        : "bg-white text-gray-600 hover:bg-gray-100 border border-gray-200"
+                    }`}
                   >
-                    {filter.label}
+                    {f.label}
+                    {f.id !== "all" && !loading && (
+                      <span className={`ml-1.5 text-[10px] font-bold ${activeFilter === f.id ? "text-gray-300" : "text-gray-400"}`}>
+                        {books.filter(b => b.status === f.id).length}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
 
+            {/* Loading skeletons */}
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-gray-200 rounded-3xl">
-                <div className="w-8 h-8 border-4 border-gray-200 border-t-gray-900 rounded-full animate-spin mb-4" />
-                <p className="text-gray-500 text-sm font-medium">Loading your workspace...</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-3 gap-4" aria-busy="true" aria-label="Loading books">
+                {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
               </div>
+            ) : filteredBooks.length === 0 && activeFilter === "all" ? (
+              <EmptyWorkspace onCreateClick={() => navigate("/create")} />
             ) : filteredBooks.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 px-6 border-2 border-dashed border-gray-200 rounded-3xl bg-white text-center">
-                <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
-                  <BookOpen className="w-8 h-8 text-gray-400" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2 font-display">No books found</h3>
-                <p className="text-gray-500 text-sm max-w-sm mb-6">
-                  {activeFilter === "all" 
-                    ? "Your workspace is empty. Start your first project to bring your memories to life." 
-                    : `You don't have any books marked as '${activeFilter}'.`}
-                </p>
-                {activeFilter === "all" && (
-                  <button
-                    onClick={() => navigate("/create")}
-                    className="inline-flex items-center gap-2 bg-gray-900 text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-rose-500 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Start a New Book
-                  </button>
-                )}
+              <div className="text-center py-16 text-gray-500 text-sm font-medium">
+                No books with status "{filters.find(f => f.id === activeFilter)?.label}".
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                
-                {/* Always show a "New Book" card in the "All" view */}
+<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">                {/* "Add new" card — first position */}
                 {activeFilter === "all" && (
                   <button
                     onClick={() => navigate("/create")}
-                    className="group flex flex-col items-center justify-center h-full min-h-[340px] rounded-2xl border-2 border-dashed border-gray-200 bg-transparent hover:border-gray-400 hover:bg-gray-50 transition-all cursor-pointer"
+                    className="group flex flex-col items-center justify-center min-h-[220px] rounded-2xl border-2 border-dashed border-gray-200 bg-transparent hover:border-gray-400 hover:bg-gray-50 transition-all cursor-pointer"
+                    aria-label="Create a new book"
                   >
-                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-4 group-hover:scale-110 transition-transform">
+                    <div className="w-11 h-11 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform" aria-hidden="true">
                       <Plus className="w-5 h-5 text-gray-900" />
                     </div>
-                    <span className="text-sm font-bold text-gray-900">Create New Book</span>
-                    <span className="text-xs text-gray-500 mt-1">Start a fresh canvas</span>
+                    <span className="text-sm font-bold text-gray-700">New Book</span>
                   </button>
                 )}
-
-                {/* Book Cards */}
-                {filteredBooks.map((book) => (
-                  <div key={book.id} className="group relative flex flex-col bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-300">
-                    
-                    {/* Cover Area */}
-                    <div className="relative aspect-[3/4] w-full bg-gray-100 rounded-t-2xl overflow-hidden p-4 flex items-center justify-center">
-                      {book.cover_image_url ? (
-                        <div className="relative w-full h-full rounded-md overflow-hidden shadow-md group-hover:scale-[1.02] transition-transform duration-500">
-                           {/* Book Spine Shadow Effect */}
-                           <div className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r from-black/20 to-transparent z-10" />
-                           <img
-                            src={book.cover_image_url}
-                            alt={book.title}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-full h-full border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center bg-white/50">
-                          <Images className="w-8 h-8 text-gray-300 mb-2" />
-                          <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">No Cover</span>
-                        </div>
-                      )}
-
-                      {/* Floating Actions Overlay */}
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3 backdrop-blur-[2px]">
-                        <button
-                          onClick={() => navigate(`/preview/${book.id}`)}
-                          className="w-10 h-10 bg-white text-gray-900 rounded-full flex items-center justify-center hover:bg-gray-100 transition-transform hover:scale-110 shadow-lg"
-                          title="Preview Book"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDelete(book.id, e)}
-                          disabled={deletingId === book.id}
-                          className="w-10 h-10 bg-white text-red-600 rounded-full flex items-center justify-center hover:bg-red-50 transition-transform hover:scale-110 shadow-lg disabled:opacity-50"
-                          title="Delete Book"
-                        >
-                          {deletingId === book.id ? (
-                            <span className="w-4 h-4 border-2 border-red-200 border-t-red-600 rounded-full animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Book Metadata */}
-                    <div className="p-5 flex flex-col flex-1">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-gray-900 text-base truncate pr-2 font-display">
-                          {book.title || "Untitled Book"}
-                        </h3>
-                        <StatusBadge status={book.status} />
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span className="truncate">{book.destination || "Destination unknown"}</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Edited {new Date(book.updated_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                      </div>
-
-                      <div className="mt-auto pt-4 border-t border-gray-50">
-                        {book.status === "complete" ? (
-                          <button
-                            onClick={() => navigate(`/order/${book.id}`)}
-                            className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-2.5 rounded-xl text-xs font-bold hover:bg-rose-500 transition-colors"
-                          >
-                            <ShoppingBag className="w-4 h-4" />
-                            Order Print
-                          </button>
-                        ) : book.status === "ordered" ? (
-                          <button
-                            onClick={() => navigate("/orders")}
-                            className="w-full flex items-center justify-center gap-2 bg-gray-50 text-gray-600 py-2.5 rounded-xl text-xs font-bold hover:bg-gray-100 transition-colors border border-gray-100"
-                          >
-                            <Package className="w-4 h-4" />
-                            Track Order
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => navigate(parseInt(book.photo_count) === 0 ? `/upload/${book.id}` : `/editor/${book.id}`)}
-                            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 py-2.5 rounded-xl text-xs font-bold hover:border-gray-900 hover:text-gray-900 transition-colors"
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            {parseInt(book.photo_count) === 0 ? "Add Photos" : "Continue Editing"}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
+                {filteredBooks.map(book => (
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    onDelete={handleDelete}
+                    deletingId={deletingId}
+                  />
                 ))}
               </div>
             )}
           </section>
 
-          {/* RIGHT: RECENT ORDERS (Takes up 1/3 width on large screens) */}
-          <aside className="w-full lg:w-80 xl:w-96 flex-shrink-0 flex flex-col gap-6">
-            <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm sticky top-24">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-bold text-gray-900 font-display">Recent Orders</h2>
-                <Link to="/orders" className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors">
+          {/* RIGHT: RECENT ORDERS */}
+          <aside
+            className="w-full lg:w-72 xl:w-80 flex-shrink-0"
+            aria-label="Recent orders"
+          >
+            <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm lg:sticky lg:top-24">
+              <div className="flex justify-between items-center mb-5">
+                <h2 className="text-base font-bold text-gray-900 font-display">Recent Orders</h2>
+                <Link
+                  to="/orders"
+                  className="text-xs font-semibold text-gray-500 hover:text-gray-900 transition-colors"
+                  aria-label="View all orders"
+                >
                   View All
                 </Link>
               </div>
 
-              {!loading && orders.length === 0 ? (
+              {loading ? (
+                <div aria-busy="true" aria-label="Loading orders">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex gap-3 p-2 mb-3" aria-hidden="true">
+                      <div className="skeleton" style={{ width: 48, height: 64, borderRadius: 8, flexShrink: 0 }} />
+                      <div className="flex-1">
+                        <div className="skeleton skeleton-title" style={{ width: "80%", marginBottom: 8 }} />
+                        <div className="skeleton skeleton-text" style={{ width: "60%" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : orders.length === 0 ? (
                 <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3" aria-hidden="true">
                     <Package className="w-5 h-5 text-gray-300" />
                   </div>
-                  <p className="text-sm font-medium text-gray-600">No orders yet</p>
-                  <p className="text-xs text-gray-400 mt-1">Your printed books will appear here.</p>
+                  <p className="text-sm font-semibold text-gray-500">No orders yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Printed books appear here.</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-4">
-                  {orders.slice(0, 4).map((order) => {
-                    // Status config for sidebar
-                    const statusConfig = {
-                      pending: { label: "Processing", dot: "bg-yellow-400" },
-                      paid: { label: "Printing", dot: "bg-blue-400" },
-                      shipped: { label: "Shipped", dot: "bg-purple-400" },
-                      delivered: { label: "Delivered", dot: "bg-green-400" },
+                <ul className="flex flex-col gap-1">
+                  {orders.slice(0, 4).map(order => {
+                    const statusDots = {
+                      pending:   "bg-yellow-400",
+                      confirmed: "bg-emerald-400",
+                      printing:  "bg-blue-400",
+                      shipped:   "bg-purple-400",
+                      delivered: "bg-green-400",
+                      cancelled: "bg-red-400",
                     };
-                    const s = statusConfig[order.status] || statusConfig.pending;
+                    const statusLabels = {
+                      pending:   "Processing",
+                      confirmed: "Confirmed",
+                      printing:  "Printing",
+                      shipped:   "Shipped",
+                      delivered: "Delivered",
+                      cancelled: "Cancelled",
+                    };
+                    const dotClass = statusDots[order.order_status] || "bg-gray-400";
+                    const statusLabel = statusLabels[order.order_status] || order.order_status;
 
                     return (
-                      <div key={order.id} className="group flex gap-3 p-3 -mx-3 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => navigate('/orders')}>
-                        {/* Mini Cover */}
-                        <div className="w-12 h-16 bg-gray-100 rounded-md overflow-hidden flex-shrink-0 border border-gray-200/50">
-                          {order.cover_image_url ? (
-                            <img src={order.cover_image_url} alt="" className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <BookOpen className="w-4 h-4 text-gray-300" />
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Details */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-center">
-                          <p className="text-sm font-bold text-gray-900 truncate mb-0.5">{order.title}</p>
-                          <p className="text-xs text-gray-500 mb-1.5">Order #{String(order.id).padStart(5, '0')}</p>
-                          <div className="flex items-center gap-1.5">
-                            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                            <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">{s.label}</span>
+                      <li key={order.id}>
+                        <button
+                          className="w-full group flex gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors text-left min-h-[44px]"
+                          onClick={() => navigate("/orders")}
+                          aria-label={`Order #${String(order.id).padStart(5,"0")} — ${statusLabel}`}
+                        >
+                          <div className="w-11 h-14 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 border border-gray-200/50">
+                            {order.cover_image_url ? (
+                              <img
+                                src={order.cover_image_url}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                aria-hidden="true"
+                                width="44"
+                                height="56"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center" aria-hidden="true">
+                                <BookOpen className="w-4 h-4 text-gray-300" />
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        
-                        {/* Arrow */}
-                        <div className="flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pr-2">
-                          <ChevronRight className="w-4 h-4 text-gray-400" />
-                        </div>
-                      </div>
+                          <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <p className="text-sm font-bold text-gray-900 truncate mb-0.5">{order.title}</p>
+                            <p className="text-xs text-gray-500 mb-1.5">#{String(order.id).padStart(5,"0")}</p>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
+                              <span className="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">{statusLabel}</span>
+                            </div>
+                          </div>
+                          <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500 transition-colors self-center flex-shrink-0" aria-hidden="true" />
+                        </button>
+                      </li>
                     );
                   })}
-                </div>
+                </ul>
               )}
             </div>
           </aside>
-
         </div>
       </main>
 
-      {/* ─── FOOTER ─────────────────────────────────────── */}
-      <footer className="border-t border-gray-200 bg-white mt-auto">
-        <div className="max-w-7xl mx-auto px-6 py-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+      {/* Footer */}
+      <footer className="border-t border-gray-200 bg-white mt-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-3">
           <p className="text-gray-400 text-xs font-medium">
             © {new Date().getFullYear()} Blushbook Nepal. All rights reserved.
           </p>
           <button
             onClick={logoutUser}
-            className="flex items-center gap-1.5 text-gray-400 hover:text-gray-900 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 text-gray-400 hover:text-gray-700 text-xs font-semibold transition-colors min-h-[36px]"
+            aria-label="Sign out of your account"
           >
-            <LogOut className="w-3.5 h-3.5" />
+            <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
             Sign Out
           </button>
         </div>
       </footer>
-
     </div>
   );
 };
